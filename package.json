@@ -1,0 +1,23 @@
+{
+  "name": "@harmoniclabs/ouroboros-miniprotocols-ts",
+  "version": "0.0.1",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc --project ./tsconfig.json && tsc-alias -p ./tsconfig.json",
+    "start": "npm run build && node ./dist/index.js"
+  },
+  "dependencies": {
+    "@harmoniclabs/cbor": "^1.1.2",
+    "@harmoniclabs/obj-utils": "^1.0.0",
+    "@harmoniclabs/uint8array-utils": "^1.0.0",
+    "@types/node": "^20.1.7"
+  },
+  "devDependencies": {},
+  "author": "Harmonic Laboratories",
+  "license": "Apache-2.0",
+  "funding": "https://github.com/sponsors/HarmonicLabs"
+}

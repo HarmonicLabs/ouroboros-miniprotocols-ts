@@ -1,0 +1,166 @@
+
+query 
+    = qrySystemStartDate
+    / qryBlockNumber
+    / qryBlockHeaderHash
+    / qryEraHistory
+    / qryCurrentEra
+    / queryEra
+
+; indipendend by current block
+qrySystemStartDate = [1]
+
+; result of `qrySystemStartDate`
+sysytemStartDate = [
+    uint, ; year
+    uint, ; day of year
+    uint  ; picoseconds of day
+];
+
+; request current acquired block number
+qryBlockNumber = [2]
+qryBlockNumberResult = [
+    1,
+    uint ; blockNo
+]
+
+; request current acquired block header hash
+qryBlockHeaderHash = [3]
+qryBlockHeaderHashResult = blockHeaderHash
+
+; request era history
+qryEraHistory = [0, [2, [0]]]
+eraHistory = [ * eraSpan ]
+eraSpan = [ begin, end, params ]
+end = [
+    #6.2(bytes), ; actually a number but very big -> timespan in nanoseconds
+    slotNo,
+    epochNo
+]
+begin
+    = [ 0, 0, 0 ] ; origin
+    / end
+
+; request current era number
+qryCurrentEra = [0, [2, [ 1 ]]]
+eraNumber 
+    = 0 ; Byron
+    / 1 ; Shelley
+    / 2 ; Allegra
+    / 3 ; Mary
+    / 4 ; Alonzo
+    / 5 ; Babbage
+    ; / 6 ; Conway ; not yet live
+
+queryEra = [ 0, [ 0, [ eraNumber, _queryEra ]]]
+_queryEra
+    = reqBlockHeaderHash
+    / reqEpochNo
+    / reqNonMyopicMemberRewards
+    / reqProtocolParams
+    / reqProtocolParamsUpdate
+    / reqStakeDistribution
+    / reqUtxoByAddr
+
+; requests block header hash of the currently acquired block
+reqBlockHeaderHash = [0]
+reqBlockHeaderHashResult = [ blockHeaderHash ]
+
+; requests epoch number of the currently acquired block
+reqEpochNo = [1];
+epochNoResult = [ epochNo ]
+
+; request an estimation of amount of lovelaces each pool would reward for a given amount delegated
+reqNonMyopicMemberRewards = [ 2, #6.258([ * stakeAmount ])]
+stakeAmount = [0, uint] ; uint is the intended amount
+nonMyopicMemberRewardsResult = [
+    { * stakeAmount => non_myopic_rewards }
+]
+non_myopic_rewards = { * poolId => uint }
+
+; requests protocolo parameters of the currently acquired block
+reqProtocolParams = [3]
+; reqProtocolParams expected result
+currProtocolParams = [
+    uint, ; minFeeA
+    uint, ; minFeeB
+    uint, ; maxBodySize
+    uint, ; maxTxSize
+    uint, ; maxBlockHeaderSize
+    uint, ; keyDeposit (lovelaces)
+    uint, ; poolDeposit (lovelaces)
+    uint, ; poolRetireMaxEpoch
+    uint, ; stakePoolTargetNum (k param)
+    cborPositiveRational, ; stakePoolTargetNum (k param)
+    cborPositiveRational, ; poolPledgeInfluence (a0 param)
+    cborPositiveRational, ; moneataryExpansion
+    cborPositiveRational, ; treasureryCut
+    cborPositiveRational, ; decentralizationParam (removed in Babbage and above)
+    uint, ; protocolVersionMajor
+    uint, ; protocolVersionMinor
+    uint, ; minPoolCost (lovelaces) ; (min fee)
+    any,  ; NA
+    costModels,
+    exUnits, ; executionUnitPrices
+    exUnits, ; maxTxExecutionUnits
+    exUnits, ; maxBlockExecutionUnits
+    uint, ; maxValueSize
+    uint, ; collateralPercentage ; 150 -> 150% of fee (at least)
+]
+
+costModels = {
+    0: [ * uint ] ; 166 params; PlutusV1
+    1: [ * uint ] ; 171 params; PlutusV2
+}
+exUnits = [
+    uint, ; priceMemory
+    uint  ; priceStep 
+]
+
+
+; requests protocol parameters of the currently acquired block
+reqProtocolParamsUpdate = [4]
+reqProtocolParamsUpdateResult = any
+
+; requests stake distribution of the currently acquired block
+reqStakeDistribution = [5]
+reqStakeDistributionResult = [
+    { * poolId => [
+        [ uint, uint ], ; cborPositiveRational but without tag; representing the stake fractions
+        vrfHash
+    ]}
+]
+
+; requests utxo at an addrress of the currently acquired block
+reqUtxoByAddr = [ 6 , #6.258([ * addr ]) ];
+utxoByAddrResult = [ utxoValues ]
+utxoValues = { * utxo => value }
+
+
+utxo = [ txId, uint ] // [ txId, uint, datum ]
+
+value = coin / [coin, multiasset<uint>]
+
+cborPositiveRational = #6.30([
+    uint, ; numerator
+    uint  ; denominator
+])
+
+datum = any; according to current era ledger ( shelley, alonzo, babbage, ...)
+
+blockHeaderHash = [ slotNo, hash32 ]
+txId = hash32
+poolId = hash28
+vrfHash = hash28
+hash32 = bytes .size 32
+hash28 = bytes .size 28
+slotNo = uint
+epochNo = uint
+addr = bytes
+coin = uint
+multiasset<a> = {*policy_id => {*asset_name => a}}
+policy_id = hash28
+asset_name = bytes .size (0..32)
+
+; unspecified || TODO
+any = int
