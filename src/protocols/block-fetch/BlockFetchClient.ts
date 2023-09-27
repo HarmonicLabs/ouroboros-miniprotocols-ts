@@ -9,6 +9,7 @@ import { BlockFetchNoBlocks } from "./BlockFetchNoBlocks";
 import { BlockFetchRequestRange } from "./BlockFetchRequestRange";
 import { BlockFetchStartBatch } from "./BlockFetchStartBatch";
 import { toHex } from "@harmoniclabs/uint8array-utils";
+import { BlockFetchBlock } from "./BlockFetchBlock";
 
 const roDescr = {
     writable: false,
@@ -25,6 +26,7 @@ type BlockFetchClientEvtListeners = {
     startBatch: BlockFetchClientEvtListener[]
     batchDone: BlockFetchClientEvtListener[]
     clientDone: BlockFetchClientEvtListener[]
+    block: BlockFetchClientEvtListener[]
 };
 
 type BlockFetchClientEvt = keyof BlockFetchClientEvtListeners;
@@ -33,6 +35,7 @@ function msgToName( msg: BlockFetchMessage ): BlockFetchClientEvt | undefined
 {
     if( msg instanceof BlockFetchRequestRange ) return "requestRange";
     if( msg instanceof BlockFetchNoBlocks ) return "noBlocks";
+    if( msg instanceof BlockFetchBlock ) return "block";
     if( msg instanceof BlockFetchStartBatch ) return "startBatch";
     if( msg instanceof BlockFetchBatchDone ) return "batchDone";
     if( msg instanceof BlockFetchClientDone ) return "clientDone";
@@ -54,6 +57,7 @@ export class BlockFetchClient
             startBatch: [],
             batchDone: [],
             clientDone: [],
+            block: []
         };
 
         function clearListeners(): void
@@ -63,6 +67,7 @@ export class BlockFetchClient
             eventListeners.startBatch.length    = 0;
             eventListeners.batchDone.length     = 0;
             eventListeners.clientDone.length    = 0;
+            eventListeners.block.length         = 0;
         }
 
         function hasEventListeners(): boolean
@@ -72,6 +77,7 @@ export class BlockFetchClient
                 eventListeners.noBlocks.length      > 0 ||
                 eventListeners.startBatch.length    > 0 ||
                 eventListeners.batchDone.length     > 0 ||
+                eventListeners.block.length         > 0 ||
                 eventListeners.clientDone.length    > 0
             );
         }
@@ -83,6 +89,10 @@ export class BlockFetchClient
         function onNoBlocks( cb: ( msg: BlockFetchNoBlocks ) => void ): void
         {
             eventListeners.noBlocks.push( cb );
+        }
+        function onBlock( cb: ( msg: BlockFetchBlock ) => void ): void
+        {
+            eventListeners.block.push( cb );
         }
         function onStartBatch( cb: ( msg: BlockFetchStartBatch ) => void ): void
         {
@@ -113,6 +123,10 @@ export class BlockFetchClient
                 },
                 onNoBlocks: {
                     value: onNoBlocks,
+                    ...roDescr
+                },
+                onBlock: {
+                    value: onBlock,
                     ...roDescr
                 },
                 onStartBatch: {
@@ -207,12 +221,13 @@ export class BlockFetchClient
 
         });
     }
-    
+
     onRequestRange!:    ( cb: ( msg: BlockFetchRequestRange ) => void ) => void
-    onNoBlocks!:        ( cb: ( msg: BlockFetchNoBlocks ) => void ) => void
-    onStartBatch!:      ( cb: ( msg: BlockFetchStartBatch ) => void ) => void
-    onBatchDone!:       ( cb: ( msg: BlockFetchBatchDone ) => void ) => void
-    onClientDone!:      ( cb: ( msg: BlockFetchClientDone ) => void ) => void
+    onNoBlocks!:        ( cb: ( msg: BlockFetchNoBlocks     ) => void ) => void
+    onBlock!:           ( cb: ( msg: BlockFetchBlock        ) => void ) => void
+    onStartBatch!:      ( cb: ( msg: BlockFetchStartBatch   ) => void ) => void
+    onBatchDone!:       ( cb: ( msg: BlockFetchBatchDone    ) => void ) => void
+    onClientDone!:      ( cb: ( msg: BlockFetchClientDone   ) => void ) => void
 
     request( point: IChainPoint ): void
     {
