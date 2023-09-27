@@ -62,17 +62,31 @@ export class BlockFetchBlock
     static fromCborObj( cbor: CborObj ): BlockFetchBlock
     {
         if(!(
+            // is array
             cbor instanceof CborArray &&
+            // with at least two elements
             cbor.array.length >= 2 &&
+            // of which the first is the `BlockFetchBlock` index
             cbor.array[0] instanceof CborUInt &&
-            cbor.array[0].num === BigInt(4) &&
-            cbor.array[1] instanceof CborTag &&
-            cbor.array[1].tag === BigInt(24) &&
-            cbor.array[1].data instanceof CborBytes
+            cbor.array[0].num === BigInt(4)
         )) throw new Error("invalid CBOR for 'BlockFetchBlock");
 
+        let arg = cbor.array[1];
+
+        if(
+            arg instanceof CborTag &&
+            arg.tag === BigInt(24) &&
+            arg.data instanceof CborBytes
+        )
+        {
+            arg = arg.data
+        }
+
+        if( !( arg instanceof CborBytes ) )
+        throw new Error("invalid CBOR for 'BlockFetchBlock");
+
         return new BlockFetchBlock({
-            blockCbor: cbor.array[1].data.buffer
+            blockCbor: arg.buffer
         });
     }
 }

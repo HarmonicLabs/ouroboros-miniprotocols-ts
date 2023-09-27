@@ -11,6 +11,7 @@ import { ChainSyncIntersectFound } from "./ChainSyncIntersectFound";
 import { ChainSyncIntersectNotFound } from "./ChainSyncIntersectNotFound";
 import { ChainSyncAwaitReply } from "./ChainSyncAwaitReply";
 import { toHex } from "@harmoniclabs/uint8array-utils";
+import { ChainSyncMessageDone } from "./ChainSyncMessageDone";
 
 const roDescr = {
     writable: false,
@@ -45,6 +46,8 @@ export class ChainSyncClient
 {
     readonly mplexer: Multiplexer;
 
+    clearListeners!: () => void;
+
     constructor( multiplexer: Multiplexer )
     {
         const eventListeners: ChainSyncClientEvtListeners = {
@@ -62,6 +65,17 @@ export class ChainSyncClient
             eventListeners.intersectFound.length    = 0;
             eventListeners.intersectNotFound.length = 0;
             eventListeners.awaitReply.length        = 0;
+        }
+
+        function hasEventListeners(): boolean
+        {
+            return (
+                eventListeners.rollBackwards.length     > 0 ||
+                eventListeners.rollForward.length       > 0 ||
+                eventListeners.intersectFound.length    > 0 ||
+                eventListeners.intersectNotFound.length > 0 ||
+                eventListeners.awaitReply.length        > 0
+            );
         }
 
         function onRollBackwards( cb: ( msg: ChainSyncRollBackwards ) => void ): void
@@ -123,6 +137,8 @@ export class ChainSyncClient
 
         multiplexer.onChainSync( chunk => {
 
+            if( !hasEventListeners() ) return;
+
             let offset: number = -1;
             let thing: { parsed: CborObj, offset: number };
 
@@ -130,12 +146,14 @@ export class ChainSyncClient
 
             if( prevBytes )
             {
+                /*
                 console.log( "prevBytes.length", prevBytes.length );
                 console.log( "chunk.length", chunk.length );
                 console.log( "prevBytes.length + chunk.length", prevBytes.length + chunk.length );
 
                 console.log( "prevBytes", toHex( prevBytes ) );
                 console.log( "chunk", toHex( chunk ) );
+                // */
 
                 const tmp = new Uint8Array( prevBytes.length + chunk.length );
                 tmp.set( prevBytes, 0 );
@@ -158,22 +176,20 @@ export class ChainSyncClient
                 
                 offset = thing.offset;
 
-                console.log( "msg byetes", offset, toHex( chunk.subarray( 0, offset ) ) );
-                
-                msg = chainSyncMessageFromCborObj( thing.parsed )
+                // console.log( "msg byetes", offset, toHex( chunk.subarray( 0, offset ) ) );
 
-                queque.unshift( msg );
-
-                if( offset < chunk.length )
+                if( offset <= chunk.length )
                 {
+                    msg = chainSyncMessageFromCborObj( thing.parsed )
+                    queque.unshift( msg );
                     // reference same memory (`subarray`)
                     // ignore the parsed bytes
                     chunk = chunk.subarray( offset );
                     continue;
                 }
-                else // if( offset >= chunk.length )
+                else // if( offset > chunk.length )
                 {
-                    prevBytes = undefined;
+                    prevBytes = chunk.slice();
                     break;
                 }
             }
@@ -184,7 +200,8 @@ export class ChainSyncClient
                 msgStr = msgToName( msg )!;
                 if( !msgStr ) continue; // ingore messages not expected by the client
 
-                for( const cb of eventListeners[ msgStr ] )
+                const listeners = eventListeners[ msgStr ];
+                for( const cb of listeners )
                 {
                     void cb( msg );
                 }
@@ -192,8 +209,6 @@ export class ChainSyncClient
 
         });
     }
-
-    clearListeners: () => void;
 
     onRollBackwards: ( cb: ( msg: ChainSyncRollBackwards ) => void ) => void
     onRollForward: ( cb: ( msg: ChainSyncRollForward ) => void ) => void
@@ -225,5 +240,19 @@ export class ChainSyncClient
                     MiniProtocol.LocalChainSync
             }
         );
+    }
+
+    done(): void
+    {
+        this.mplexer.send(
+            new ChainSyncMessageDone().toCbor().toBuffer(),
+            {
+                hasAgency: true,
+                protocol: this.mplexer.isN2N ? 
+                    MiniProtocol.ChainSync :
+                    MiniProtocol.LocalChainSync
+            }
+        );
+        this.clearListeners();
     }
 }

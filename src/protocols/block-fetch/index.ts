@@ -5,3 +5,4 @@ export * from "./BlockFetchMessage";
 export * from "./BlockFetchNoBlocks";
 export * from "./BlockFetchRequestRange";
 export * from "./BlockFetchStartBatch";
+export * from "./BlockFetchClient";
