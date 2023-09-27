@@ -1,6 +1,6 @@
 {
   "name": "@harmoniclabs/ouroboros-miniprotocols-ts",
-  "version": "0.0.1-dev1",
+  "version": "0.0.1-dev2",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
