@@ -63,7 +63,7 @@ export interface NodeSocketLike {
     /**
      * subscribe to an event
     **/
-    on(event: "close", listener: (hadError: boolean) => void): this;
+    on(event: "close", listener: (hadError: any) => void): this;
     on(event: "error", listener: (err: Error) => void): this;
     on(event: "data", listener: (data: Buffer) => void): this;
     on(event: "connect", listener: () => void): this;
@@ -72,15 +72,23 @@ export interface NodeSocketLike {
     // on(event: "lookup", listener: (err: Error, address: string, family: string | number, host: string) => void): this;
     // on(event: "ready", listener: () => void): this;
     // on(event: "timeout", listener: () => void): this;
+    /**
+     * unsubscribe to an event
+    **/
+    removeListener(event: "close", listener: (hadError: boolean) => void): this;
+    removeListener(event: "error", listener: (err: Error) => void): this;
+    removeListener(event: "data", listener: (data: Buffer) => void): this;
+    removeListener(event: "connect", listener: () => void): this;
 }
 
 
 export function isNodeSocketLike( s: any ): s is NodeSocketLike
 {
     return isObject( s ) && (
-        typeof s.end        === "function" &&
-        typeof s.write      === "function" &&
-        typeof s.on         === "function"
+        typeof s.end            === "function" &&
+        typeof s.write          === "function" &&
+        typeof s.on             === "function" &&
+        typeof s.removeListener === "function"
     );
 }
 
@@ -108,10 +116,32 @@ export interface WebSocketLike {
      * [MDN Reference](https://developer.mozilla.org/docs/Web/API/WebSocket/close)
      */
     close(code?: number, reason?: string): void;
+    /**
+     * Appends an event listener for events whose type attribute value is type. The callback argument sets the callback that will be invoked when the event is dispatched.
+     *
+     * The options argument sets listener-specific options. For compatibility this can be a boolean, in which case the method behaves exactly as if the value was specified as options's capture.
+     *
+     * When set to true, options's capture prevents callback from being invoked when the event's eventPhase attribute value is BUBBLING_PHASE. When false (or not present), callback will not be invoked when event's eventPhase attribute value is CAPTURING_PHASE. Either way, callback will be invoked if event's eventPhase attribute value is AT_TARGET.
+     *
+     * When set to true, options's passive indicates that the callback will not cancel the event by invoking preventDefault(). This is used to enable performance optimizations described in § 2.8 Observing event listeners.
+     *
+     * When set to true, options's once indicates that the callback will only be invoked once after which the event listener will be removed.
+     *
+     * If an AbortSignal is passed for options's signal, then the event listener will be removed when signal is aborted.
+     *
+     * The event listener is appended to target's event listener list and is not appended if it has the same type, callback, and capture.
+     *
+     * [MDN Reference](https://developer.mozilla.org/docs/Web/API/EventTarget/addEventListener)
+     */
     addEventListener<K extends keyof WebSocketEventMap>(type: K, listener: (this: WebSocket, ev: WebSocketEventMap[K]) => any, options?: boolean | AddEventListenerOptions): void;
     addEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void;
-    // removeEventListener<K extends keyof WebSocketEventMap>(type: K, listener: (this: WebSocket, ev: WebSocketEventMap[K]) => any, options?: boolean | EventListenerOptions): void;
-    // removeEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions): void;
+    /**
+     * Removes the event listener in target's event listener list with the same type, callback, and options.
+     *
+     * [MDN Reference](https://developer.mozilla.org/docs/Web/API/EventTarget/removeEventListener)
+     */
+    removeEventListener<K extends keyof WebSocketEventMap>(type: K, listener: (this: WebSocket, ev: WebSocketEventMap[K]) => any, options?: boolean | EventListenerOptions): void;
+    removeEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions): void;
     /**
      * [MDN docs](https://developer.mozilla.org/en-US/docs/Web/API/WebSocket/readyState)
      * 
@@ -133,8 +163,8 @@ export function isWebSocketLike( s: any ): s is WebSocketLike
     return isObject( s ) && (
         typeof s.send                   === "function" &&
         typeof s.close                  === "function" &&
-        typeof s.addEventListener       === "function"
-        // typeof s.removeEventListener    === "function"
+        typeof s.addEventListener       === "function" &&
+        typeof s.removeEventListener    === "function"
     );
 }
 
@@ -151,7 +181,9 @@ export function isNode2NodeSocket( socketLike: SocketLike ): boolean
     // WebSockets only n2n
     if( isWebSocketLike( socketLike ) ) return true;
 
-    return isNodeSocketLike( socketLike ) && Object.keys( socketLike.address() ?? {} ).length > 0 ;
+    return isNodeSocketLike( socketLike ) &&
+        // UNIX socket address (node-to-client) is `{}` 
+        Object.keys( socketLike.address() ?? {} ).length > 0 ;
 }
 
 /**
@@ -159,14 +191,25 @@ export function isNode2NodeSocket( socketLike: SocketLike ): boolean
 **/
 export interface WrappedSocket {
     send: ( data: Uint8Array ) => void
+    /**
+     * close the comunication
+     */
     close: () => void
     /**
      * subscribe to an event
     **/
-    on(event: "close", listener: (hadError: boolean) => void): void;
+    on(event: "close", listener: ( hadError: boolean ) => void): void;
     on(event: "error", listener: ( thing: Error | Event ) => void ): void;
-    on(event: "data", listener: (data: Uint8Array) => void): void;
+    on(event: "data", listener: ( data: Uint8Array ) => void): void;
     on(event: "connect", listener: () => void): void;
+    /**
+     * unsubscribe to an event
+    **/
+    off(event: "close", listener: ( hadError: boolean ) => void): void;
+    off(event: "error", listener: ( thing: Error | Event ) => void ): void;
+    off(event: "data", listener: ( data: Uint8Array ) => void): void;
+    off(event: "connect", listener: () => void): void;
+    
     /**
      * used to retry connecting the socket in the event is needed after it has been closed
     **/
@@ -222,7 +265,7 @@ export function wrapSocket(
                 {
                     socketLike.addEventListener(
                         "close",
-                        evt => listener( !evt.wasClean )
+                        listener
                     );
                 }
                 else if( evt === "error" )
@@ -249,6 +292,40 @@ export function wrapSocket(
                 else {
                     // unknown event type; ignore
                 }
+            },
+            off( evt: WrappedSocketEvt, listener: ( thing: any ) => void ): void
+            {
+                if( evt === "close" )
+                {
+                    socketLike.removeEventListener(
+                        "close",
+                        listener
+                    );
+                }
+                else if( evt === "error" )
+                {
+                    socketLike.removeEventListener(
+                        "error",
+                        listener
+                    );
+                }
+                else if( evt === "connect" )
+                {
+                    socketLike.removeEventListener(
+                        "open",
+                        listener
+                    );
+                }
+                else if( evt === "data" )
+                {
+                    socketLike.removeEventListener(
+                        "message",
+                        evt => listener( new Uint8Array( evt.data ) )
+                    );
+                }
+                else {
+                    // unknown event type; ignore
+                }
             }
         };
 
@@ -263,7 +340,8 @@ export function wrapSocket(
             isReady: nodeSocketLikeIsReady.bind( socketLike ),
             send: socketLike.write.bind( socketLike ),
             close: socketLike.end.bind( socketLike ),
-            on: socketLike.on.bind( socketLike )
+            on: socketLike.on.bind( socketLike ),
+            off: socketLike.removeListener.bind( socketLike ),
         };
 
         return Object.freeze( socket );

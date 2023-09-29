@@ -1,4 +1,4 @@
-import { MiniProtocol } from "../MiniProtocol";
+import { MiniProtocol, miniProtocolToNumber } from "../MiniProtocol";
 import { SocketLike, WrappedSocket, isNode2NodeSocket, isWebSocketLike, wrapSocket } from "./SocketLike";
 import { MultiplexerHeaderInfos, unwrapMultiplexerMessage, wrapMultiplexerMessage } from "./multiplexerMessage";
 
@@ -23,12 +23,19 @@ export interface MultiplexerConfig {
     reconnect: ( this: SocketLike ) => SocketLike
 }
 
+export type MultiplexerCloseOptions = {
+    /**
+     * @default true
+    **/
+    closeSocket: boolean
+}
+
 export class Multiplexer
 {
     readonly socket: WrappedSocket
     readonly isN2N: boolean
 
-    readonly clearListeners: () => void
+    readonly clearListeners: ( protocol?: MiniProtocol ) => void
 
     onHandshake!: ( cb: MultiplexerEvtListener ) => void
     onChainSync!: ( cb: MultiplexerEvtListener ) => void
@@ -38,6 +45,9 @@ export class Multiplexer
     onKeepAlive!: ( cb: MultiplexerEvtListener ) => void
 
     send: ( payload: Uint8Array, header: MultiplexerHeaderInfos ) => void;
+
+    close: ( options?: MultiplexerCloseOptions ) => void;
+    isClosed: () => boolean
 
     constructor( socketLike: SocketLike , cfg: MultiplexerConfig )
     {
@@ -53,6 +63,11 @@ export class Multiplexer
             }
         }
 
+        function throwIfThruthy( thing: any ): void
+        {
+            if( thing ) throw thing;
+        }
+
         const eventListeners: MultiplexerEvtListeners = {
             [MiniProtocol.Handshake]: [],
             [MiniProtocol.ChainSync]: [],
@@ -64,8 +79,24 @@ export class Multiplexer
             [MiniProtocol.KeepAlive]: []
         };
 
-        function clearListeners(): void
+        function forwardMessage(chunk: Uint8Array)
         {
+            const { header, payload } = unwrapMultiplexerMessage( chunk );
+
+            for( const cb of eventListeners[header.protocol] )
+            {
+                void cb( payload, header );
+            }
+        }
+
+        function clearListeners( protocol?: MiniProtocol ): void
+        {
+            if( protocol !== undefined )
+            {
+                protocol = miniProtocolToNumber( protocol );
+                eventListeners[protocol].length = 0;
+                return;
+            }
             eventListeners[MiniProtocol.Handshake]          .length = 0
             eventListeners[MiniProtocol.ChainSync]          .length = 0
             eventListeners[MiniProtocol.LocalChainSync]     .length = 0
@@ -77,21 +108,28 @@ export class Multiplexer
         }
 
         socket.on("close", reconnectSocket );
-        socket.on("error", (err: any) => {
-            if( err ){
-                throw err;
-            }
-        });
-        socket.on("data", (chunk) => {
+        socket.on("error", throwIfThruthy  );
+        socket.on("data" , forwardMessage  );
 
-            const { header, payload } = unwrapMultiplexerMessage( chunk );
+        let _wasClosed: boolean = false;
 
-            for( const cb of eventListeners[header.protocol] )
-            {
-                void cb( payload, header );
-            }
+        function close( options?: MultiplexerCloseOptions ): void
+        {
+            socket.off("close", reconnectSocket );
+            socket.off("error", throwIfThruthy  );
+            socket.off("data" , forwardMessage  );
 
-        });
+            const closeSocket =
+                options ? 
+                ( options.closeSocket === false ? false : true ) : 
+                true;
+
+            if( closeSocket && !socket.isClosed() ) socket.close();
+
+            _wasClosed = true;
+        }
+
+        function isClosed(): boolean { return _wasClosed; }
 
         function send( payload: Uint8Array, header: MultiplexerHeaderInfos, attempt = 0 ): void
         {
@@ -164,6 +202,14 @@ export class Multiplexer
                 },
                 send: {
                     value: send,
+                    ...roDescr
+                },
+                close: {
+                    value: close,
+                    ...roDescr
+                },
+                isClosed: {
+                    value: isClosed,
                     ...roDescr
                 },
                 onHandshake: {

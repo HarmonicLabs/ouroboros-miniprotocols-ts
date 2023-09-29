@@ -11,7 +11,7 @@ export function isIBlockFetchBlock( stuff: any ): stuff is IBlockFetchBlock
         hasOwn( stuff, "blockCbor" ) &&
         (
             CborString.isValidHexValue( stuff.blockCbor ) ||
-            stuff.blockCbor( stuff.blockCbor instanceof Uint8Array) ||
+            stuff.blockCbor instanceof Uint8Array ||
             stuff.blockCbor instanceof CborString
         )
     );
@@ -22,15 +22,15 @@ export class BlockFetchBlock
 {
     readonly blockCbor: CborString;
 
-    constructor({ blockCbor }: IBlockFetchBlock)
+    constructor( iblock: IBlockFetchBlock)
     {
         if(!(
-            isIBlockFetchBlock( blockCbor )
-        )) throw new Error("invalid CBOR for 'BlockFetchBlock'");
+            isIBlockFetchBlock( iblock )
+        )) throw new Error("invalid interface for 'BlockFetchBlock'");
 
         Object.defineProperty(
             this, "blockCbor", {
-                value: forceCborString( blockCbor ),
+                value: forceCborString( iblock.blockCbor ),
                 writable: false,
                 enumerable: true,
                 configurable: false

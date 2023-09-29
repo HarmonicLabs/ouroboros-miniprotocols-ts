@@ -5,7 +5,7 @@ import { BlockFetchClientDone, IBlockFetchClientDone } from "./BlockFetchClientD
 import { BlockFetchNoBlocks, IBlockFetchNoBlocks } from "./BlockFetchNoBlocks";
 import { BlockFetchRequestRange, IBlockFetchRequestRange } from "./BlockFetchRequestRange";
 import { BlockFetchStartBatch, IBlockFetchStartBatch } from "./BlockFetchStartBatch";
-import { CborArray, CborObj, CborUInt } from "@harmoniclabs/cbor";
+import { CanBeCborString, Cbor, CborArray, CborObj, CborUInt, forceCborString } from "@harmoniclabs/cbor";
 
 export type BlockFetchMessage
     = BlockFetchRequestRange
@@ -35,6 +35,16 @@ export type IBlockFetchMessage
     | IBlockFetchBlock
     | IBlockFetchBatchDone;
 
+export function blockFetchMessageFromCbor( cbor: CanBeCborString ): BlockFetchMessage
+{
+    return blockFetchMessageFromCborObj(
+        Cbor.parse( 
+            cbor instanceof Uint8Array ? 
+                cbor :
+                forceCborString( cbor )
+        )
+    );
+}
 
 export function blockFetchMessageFromCborObj( cbor: CborObj ): BlockFetchMessage
 {

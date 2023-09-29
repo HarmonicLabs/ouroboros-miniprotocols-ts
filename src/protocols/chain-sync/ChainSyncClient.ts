@@ -177,11 +177,11 @@ export class ChainSyncClient
                 offset = thing.offset;
 
                 // console.log( "msg byetes", offset, toHex( chunk.subarray( 0, offset ) ) );
+                msg = chainSyncMessageFromCborObj( thing.parsed )
+                queque.unshift( msg );
 
-                if( offset <= chunk.length )
+                if( offset < chunk.length )
                 {
-                    msg = chainSyncMessageFromCborObj( thing.parsed )
-                    queque.unshift( msg );
                     // reference same memory (`subarray`)
                     // ignore the parsed bytes
                     chunk = chunk.subarray( offset );
@@ -189,7 +189,9 @@ export class ChainSyncClient
                 }
                 else // if( offset > chunk.length )
                 {
-                    prevBytes = chunk.slice();
+                    prevBytes = offset === chunk.length ? 
+                        undefined : 
+                        Uint8Array.prototype.slice.call( chunk );
                     break;
                 }
             }
