@@ -423,12 +423,6 @@ export class ChainSyncClient
 
                 dispatchEvent( msgStr, msg );
             }
-
-            if( prevBytes )
-            {
-                console.log("un-handled bytes; requesting next");
-                this.requestNext();
-            }
         });
     }
 
