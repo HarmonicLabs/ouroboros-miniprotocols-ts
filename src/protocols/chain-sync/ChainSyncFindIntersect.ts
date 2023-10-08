@@ -1,5 +1,6 @@
 import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
 import { ChainPoint, IChainPoint, isIChainPoint } from "../types/ChainPoint";
+import { getCborBytesDescriptor } from "./utils/getCborBytesDescriptor";
 
 export interface IChainSyncFindIntersect {
     points: readonly IChainPoint[]
@@ -8,6 +9,8 @@ export interface IChainSyncFindIntersect {
 export class ChainSyncFindIntersect
     implements ToCbor, ToCborObj, IChainSyncFindIntersect
 {
+    readonly cborBytes?: Uint8Array | undefined;
+    
     readonly points: readonly ChainPoint[];
 
     constructor({ points }: IChainSyncFindIntersect)
@@ -23,6 +26,9 @@ export class ChainSyncFindIntersect
                 enumerable: true,
                 configurable: false
             }
+        );
+        Object.defineProperty(
+            this, "cborBytes", getCborBytesDescriptor()
         );
     }
 
@@ -47,7 +53,16 @@ export class ChainSyncFindIntersect
 
     static fromCbor( cbor: CanBeCborString ): ChainSyncFindIntersect
     {
-        return ChainSyncFindIntersect.fromCborObj( Cbor.parse( forceCborString( cbor ) ) );
+        const buff = cbor instanceof Uint8Array ?
+            cbor: 
+            forceCborString( cbor ).toBuffer();
+            
+        const msg = ChainSyncFindIntersect.fromCborObj( Cbor.parse( buff ) );
+
+        // @ts-ignore Cannot assign to 'cborBytes' because it is a read-only property.ts(2540)
+        msg.cborBytes = buff;
+        
+        return msg;
     }
     static fromCborObj( cbor: CborObj ): ChainSyncFindIntersect
     {

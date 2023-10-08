@@ -1,4 +1,5 @@
-import { MiniProtocol, miniProtocolToNumber } from "../MiniProtocol";
+import { toHex } from "@harmoniclabs/uint8array-utils";
+import { MiniProtocol, isMiniProtocol, miniProtocolToNumber, miniProtocolToString } from "../MiniProtocol";
 import { SocketLike, WrappedSocket, isNode2NodeSocket, isWebSocketLike, wrapSocket } from "./SocketLike";
 import { MultiplexerHeaderInfos, unwrapMultiplexerMessage, wrapMultiplexerMessage } from "./multiplexerMessage";
 
@@ -10,17 +11,25 @@ const roDescr = {
     configurable: false
 };
 
-export type MultiplexerEvtListener = ( msg: Uint8Array, header: MultiplexerHeaderInfos ) => void;
+export type MultiplexerEvtListener = ( payload: Uint8Array, header: MultiplexerHeaderInfos ) => void;
 
 type MultiplexerEvtListeners = {
-    [protocol: number]: MultiplexerEvtListener[]
+    [MiniProtocol.BlockFetch]: MultiplexerEvtListener[]
+    [MiniProtocol.ChainSync]: MultiplexerEvtListener[]
+    [MiniProtocol.Handshake]: MultiplexerEvtListener[]
+    [MiniProtocol.KeepAlive]: MultiplexerEvtListener[]
+    [MiniProtocol.LocalChainSync]: MultiplexerEvtListener[]
+    [MiniProtocol.LocalStateQuery]: MultiplexerEvtListener[]
+    [MiniProtocol.LocalTxSubmission]: MultiplexerEvtListener[]
+    [MiniProtocol.TxSubmission]: MultiplexerEvtListener[]
+    error: (( err: Error ) => void)[]
 };
 
 export type MultiplexerProtocolType = "node-to-node" | "node-to-client";
 
 export interface MultiplexerConfig {
     protocolType: MultiplexerProtocolType,
-    reconnect: ( this: SocketLike ) => SocketLike
+    connect: () => SocketLike
 }
 
 export type MultiplexerCloseOptions = {
@@ -49,9 +58,10 @@ export class Multiplexer
     close: ( options?: MultiplexerCloseOptions ) => void;
     isClosed: () => boolean
 
-    constructor( socketLike: SocketLike , cfg: MultiplexerConfig )
+    constructor( cfg: MultiplexerConfig )
     {
-        const reconnect = cfg.reconnect;
+        const reconnect = cfg.connect;
+        const socketLike = reconnect();
         let socket = wrapSocket( socketLike, reconnect );
         const isN2N: boolean = cfg.protocolType !== "node-to-client";
         
@@ -63,11 +73,6 @@ export class Multiplexer
             }
         }
 
-        function throwIfThruthy( thing: any ): void
-        {
-            if( thing ) throw thing;
-        }
-
         const eventListeners: MultiplexerEvtListeners = {
             [MiniProtocol.Handshake]: [],
             [MiniProtocol.ChainSync]: [],
@@ -76,39 +81,68 @@ export class Multiplexer
             [MiniProtocol.TxSubmission]: [],
             [MiniProtocol.LocalTxSubmission]: [],
             [MiniProtocol.LocalStateQuery]: [],
-            [MiniProtocol.KeepAlive]: []
+            [MiniProtocol.KeepAlive]: [],
+            error: []
         };
+
+        function handleSocketError( thing: Error | Event ): void
+        {
+            const errorCbs = eventListeners.error;
+            const err = new Error("socket error");
+            (err as any).data = thing;
+            for( const cb of errorCbs )
+            {
+                void cb( err );
+            }
+            return;
+        }
 
         function forwardMessage(chunk: Uint8Array)
         {
             const { header, payload } = unwrapMultiplexerMessage( chunk );
+            if( !isMiniProtocol( header.protocol ) )
+            {
+                const errorCbs = eventListeners.error;
+                const err = new Error(
+                    "unwrapped Multiplexer header was not a mini protocol;\nmultiplexer chunk received: " + 
+                    toHex( Uint8Array.prototype.slice.call( chunk ) )
+                );
 
-            for( const cb of eventListeners[header.protocol] )
+                for( const cb of errorCbs )
+                {
+                    void cb( err );
+                }
+                return;
+            }
+
+            const listeners = eventListeners[header.protocol];
+            for( const cb of listeners )
             {
                 void cb( payload, header );
             }
         }
 
-        function clearListeners( protocol?: MiniProtocol ): void
+        function clearListeners( protocol?: MiniProtocol | "error" ): void
         {
             if( protocol !== undefined )
             {
-                protocol = miniProtocolToNumber( protocol );
+                protocol = protocol === "error" ? protocol : miniProtocolToNumber( protocol );
                 eventListeners[protocol].length = 0;
                 return;
             }
-            eventListeners[MiniProtocol.Handshake]          .length = 0
-            eventListeners[MiniProtocol.ChainSync]          .length = 0
-            eventListeners[MiniProtocol.LocalChainSync]     .length = 0
-            eventListeners[MiniProtocol.BlockFetch]         .length = 0
-            eventListeners[MiniProtocol.TxSubmission]       .length = 0
-            eventListeners[MiniProtocol.LocalTxSubmission]  .length = 0
-            eventListeners[MiniProtocol.LocalStateQuery]    .length = 0
-            eventListeners[MiniProtocol.KeepAlive]          .length = 0
+            eventListeners[MiniProtocol.Handshake]          .length = 0;
+            eventListeners[MiniProtocol.ChainSync]          .length = 0;
+            eventListeners[MiniProtocol.LocalChainSync]     .length = 0;
+            eventListeners[MiniProtocol.BlockFetch]         .length = 0;
+            eventListeners[MiniProtocol.TxSubmission]       .length = 0;
+            eventListeners[MiniProtocol.LocalTxSubmission]  .length = 0;
+            eventListeners[MiniProtocol.LocalStateQuery]    .length = 0;
+            eventListeners[MiniProtocol.KeepAlive]          .length = 0;
+            eventListeners.error                            .length = 0;
         }
 
         socket.on("close", reconnectSocket );
-        socket.on("error", throwIfThruthy  );
+        socket.on("error", handleSocketError );
         socket.on("data" , forwardMessage  );
 
         let _wasClosed: boolean = false;
@@ -116,7 +150,7 @@ export class Multiplexer
         function close( options?: MultiplexerCloseOptions ): void
         {
             socket.off("close", reconnectSocket );
-            socket.off("error", throwIfThruthy  );
+            socket.off("error", handleSocketError );
             socket.off("data" , forwardMessage  );
 
             const closeSocket =

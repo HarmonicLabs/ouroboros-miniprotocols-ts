@@ -15,12 +15,34 @@ export enum MiniProtocol {
 
 Object.freeze( MiniProtocol );
 
-export function miniProtocolToNumber( protocol: MiniProtocol ): number
+export function miniProtocolToNumber( protocol: number | string ): number
 {
-    return typeof protocol === "string" ? MiniProtocol[protocol] as any as number : Number( protocol );
+    return typeof protocol === "string" ? MiniProtocol[protocol as any] as any as number : Number( protocol );
 }
 
-export function miniProtocolToString( protocol: MiniProtocol ): string
+export function miniProtocolToString( protocol: number | string ): string
 {
     return typeof protocol === "number" ? MiniProtocol[protocol] : String( protocol );
+}
+
+export function isMiniProtocol( protocol: number | string ): boolean
+{
+    if( typeof protocol === "number" )
+    {
+        return (
+            protocol === MiniProtocol.BlockFetch        ||
+            protocol === MiniProtocol.ChainSync         ||
+            protocol === MiniProtocol.Handshake         ||
+            protocol === MiniProtocol.KeepAlive         ||
+            protocol === MiniProtocol.LocalChainSync    ||
+            protocol === MiniProtocol.LocalStateQuery   ||
+            protocol === MiniProtocol.LocalTxSubmission ||
+            protocol === MiniProtocol.TxSubmission
+        );
+    }
+    else if( typeof protocol === "string" )
+    {
+        return isMiniProtocol( miniProtocolToNumber( protocol ) )
+    }
+    return false;
 }

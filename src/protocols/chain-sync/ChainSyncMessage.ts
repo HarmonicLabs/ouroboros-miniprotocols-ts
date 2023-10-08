@@ -51,7 +51,16 @@ export function isIChainSyncMessage( stuff: any ): stuff is IChainSyncMessage
 
 export function chainSyncMessageFromCbor( cbor: CanBeCborString ): ChainSyncMessage
 {
-    return chainSyncMessageFromCborObj( Cbor.parse( forceCborString( cbor ) ) );
+    const buff = cbor instanceof Uint8Array ? 
+        cbor : 
+        forceCborString( cbor ).toBuffer();
+    
+    const msg = chainSyncMessageFromCborObj( Cbor.parse( buff ) );
+
+    // @ts-ignore Cannot assign to 'cborBytes' because it is a read-only property.ts(2540)
+    msg.cborBytes = buff;
+
+    return msg;
 }
 export function chainSyncMessageFromCborObj( cbor: CborObj ): ChainSyncMessage
 {

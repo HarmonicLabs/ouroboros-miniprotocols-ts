@@ -1,6 +1,7 @@
 import { CanBeCborString, Cbor, CborArray, CborBytes, CborObj, CborString, CborTag, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
 import { ChainPoint, IChainPoint, isIChainPoint } from "../types/ChainPoint";
 import { ChainTip, IChainTip, isIChainTip } from "../types/ChainTip";
+import { getCborBytesDescriptor } from "./utils/getCborBytesDescriptor";
 
 export interface IChainSyncRollBackwards {
     point: IChainPoint,
@@ -10,6 +11,8 @@ export interface IChainSyncRollBackwards {
 export class ChainSyncRollBackwards
     implements ToCbor, ToCborObj, IChainSyncRollBackwards
 {
+    readonly cborBytes?: Uint8Array | undefined;
+    
     readonly point: ChainPoint;
     readonly tip: ChainTip;
 
@@ -22,6 +25,7 @@ export class ChainSyncRollBackwards
 
         Object.defineProperties(
             this, {
+                cborBytes: getCborBytesDescriptor(),
                 point: {
                     value: new ChainPoint( point ),
                     writable: false,
@@ -61,7 +65,16 @@ export class ChainSyncRollBackwards
 
     static fromCbor( cbor: CanBeCborString ): ChainSyncRollBackwards
     {
-        return ChainSyncRollBackwards.fromCborObj( Cbor.parse( forceCborString( cbor ) ) );
+        const buff = cbor instanceof Uint8Array ?
+            cbor: 
+            forceCborString( cbor ).toBuffer();
+            
+        const msg = ChainSyncRollBackwards.fromCborObj( Cbor.parse( buff ) );
+        
+        // @ts-ignore Cannot assign to 'cborBytes' because it is a read-only property.ts(2540)
+        msg.cborBytes = buff;
+        
+        return msg;
     }
     static fromCborObj( cbor: CborObj ): ChainSyncRollBackwards
     {

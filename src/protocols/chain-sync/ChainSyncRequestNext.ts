@@ -1,5 +1,6 @@
 import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
 import { isObject } from "@harmoniclabs/obj-utils";
+import { getCborBytesDescriptor } from "./utils/getCborBytesDescriptor";
 
 export interface IChainSyncRequestNext{}
 
@@ -11,7 +12,14 @@ export function isIChainSyncRequestNext( stuff: any ): stuff is IChainSyncReques
 export class ChainSyncRequestNext
     implements ToCbor, ToCborObj, IChainSyncRequestNext
 {
-    constructor() {};
+    readonly cborBytes?: Uint8Array | undefined;
+
+    constructor()
+    {
+        Object.defineProperty(
+            this, "cborBytes", getCborBytesDescriptor()
+        );
+    };
 
     toJson() { return {}; }
 
@@ -26,7 +34,16 @@ export class ChainSyncRequestNext
 
     static fromCbor( cbor: CanBeCborString ): ChainSyncRequestNext
     {
-        return ChainSyncRequestNext.fromCborObj( Cbor.parse( forceCborString( cbor ) ) );
+        const buff = cbor instanceof Uint8Array ?
+            cbor: 
+            forceCborString( cbor ).toBuffer();
+
+        const msg = ChainSyncRequestNext.fromCborObj( Cbor.parse( buff ) );
+        
+        // @ts-ignore Cannot assign to 'cborBytes' because it is a read-only property.ts(2540)
+        msg.cborBytes = buff;
+        
+        return msg;
     }
     static fromCborObj( cbor: CborObj ): ChainSyncRequestNext
     {

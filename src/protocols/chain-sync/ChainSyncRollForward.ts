@@ -1,28 +1,44 @@
 import { CanBeCborString, Cbor, CborArray, CborBytes, CborObj, CborString, CborTag, CborUInt, ToCbor, ToCborObj, forceCborString, isCborObj } from "@harmoniclabs/cbor";
 import { ChainTip, IChainTip, isIChainTip } from "../types/ChainTip";
+import { getCborBytesDescriptor } from "./utils/getCborBytesDescriptor";
 
 export interface IChainSyncRollForward {
-    blockHeaderCbor: CborObj,
+    blockData: CborObj
+    /** @deprecated */
+    blockHeaderCbor?: CborObj,
     tip: IChainTip
 }
 
 export class ChainSyncRollForward
     implements ToCbor, ToCborObj, IChainSyncRollForward
 {
+    readonly cborBytes?: Uint8Array | undefined;
+
+    readonly blockData: CborObj;
+    /** @deprecated */
     readonly blockHeaderCbor: CborObj;
     readonly tip: ChainTip;
 
-    constructor({ blockHeaderCbor, tip }: IChainSyncRollForward)
+    constructor({ blockData, tip }: IChainSyncRollForward)
     {
         if(!(
-            isCborObj( blockHeaderCbor ) &&
+            isCborObj( blockData ) &&
             isIChainTip( tip )
         )) throw new Error("invalid IChainSyncRollForward interface");
 
+        let _cborBytes: Uint8Array | undefined = undefined;
+        
         Object.defineProperties(
             this, {
+                cborBytes: getCborBytesDescriptor(),
+                blockData: {
+                    value: blockData,
+                    writable: false,
+                    enumerable: true,
+                    configurable: false
+                },
                 blockHeaderCbor: {
-                    value: blockHeaderCbor,
+                    value: blockData,
                     writable: false,
                     enumerable: true,
                     configurable: false
@@ -40,14 +56,14 @@ export class ChainSyncRollForward
     toJson()
     {
         return {
-            blockHeaderCbor: Cbor.encode( this.blockHeaderCbor ).toString(),
+            blockData: Cbor.encode( this.blockData ).toString(),
             tip: this.tip.toJson()
         };
     }
 
     toString(): string
     {
-        return `(roll forward: (header: ${Cbor.encode(this.blockHeaderCbor).toString()}) ${this.tip.toString()} )`
+        return `(roll forward: (header: ${Cbor.encode(this.blockData).toString()}) ${this.tip.toString()} )`
     }
 
     toCbor(): CborString
@@ -58,14 +74,23 @@ export class ChainSyncRollForward
     {
         return new CborArray([
             new CborUInt(2),
-            this.blockHeaderCbor,
+            this.blockData,
             this.tip.toCborObj()
         ]);
     }
 
     static fromCbor( cbor: CanBeCborString ): ChainSyncRollForward
     {
-        return ChainSyncRollForward.fromCborObj( Cbor.parse( forceCborString( cbor ) ) );
+        const buff = cbor instanceof Uint8Array ?
+            cbor: 
+            forceCborString( cbor ).toBuffer();
+
+        const msg = ChainSyncRollForward.fromCborObj( Cbor.parse( buff ) );
+
+        // @ts-ignore Cannot assign to 'cborBytes' because it is a read-only property.ts(2540)
+        msg.cborBytes = buff;
+        
+        return msg;
     }
     static fromCborObj( cbor: CborObj ): ChainSyncRollForward
     {
@@ -79,7 +104,7 @@ export class ChainSyncRollForward
         const [ _idx, headerCbor, tipCbor ] = cbor.array;
 
         return new ChainSyncRollForward({
-            blockHeaderCbor: headerCbor,
+            blockData: headerCbor,
             tip: ChainTip.fromCborObj( tipCbor )
         });
     }

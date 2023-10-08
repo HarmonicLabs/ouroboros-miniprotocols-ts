@@ -1,5 +1,6 @@
 import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
 import { ChainTip, IChainTip, isIChainTip } from "../types/ChainTip";
+import { getCborBytesDescriptor } from "./utils/getCborBytesDescriptor";
 
 export interface IChainSyncIntersectNotFound {
     tip: IChainTip
@@ -8,6 +9,8 @@ export interface IChainSyncIntersectNotFound {
 export class ChainSyncIntersectNotFound
     implements ToCbor, ToCborObj, IChainSyncIntersectNotFound
 {
+    readonly cborBytes?: Uint8Array | undefined;
+    
     readonly tip: ChainTip;
 
     constructor({ tip }: IChainSyncIntersectNotFound)
@@ -18,6 +21,7 @@ export class ChainSyncIntersectNotFound
 
         Object.defineProperties(
             this, {
+                cborBytes: getCborBytesDescriptor(),
                 tip: {
                     value: new ChainTip( tip ),
                     writable: false,
@@ -49,7 +53,16 @@ export class ChainSyncIntersectNotFound
 
     static fromCbor( cbor: CanBeCborString ): ChainSyncIntersectNotFound
     {
-        return ChainSyncIntersectNotFound.fromCborObj( Cbor.parse( forceCborString( cbor ) ) );
+        const buff = cbor instanceof Uint8Array ?
+            cbor: 
+            forceCborString( cbor ).toBuffer();
+            
+        const msg = ChainSyncIntersectNotFound.fromCborObj( Cbor.parse( buff ) );
+        
+        // @ts-ignore Cannot assign to 'cborBytes' because it is a read-only property.ts(2540)
+        msg.cborBytes = buff;
+        
+        return msg;
     }
     static fromCborObj( cbor: CborObj ): ChainSyncIntersectNotFound
     {
