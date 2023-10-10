@@ -1,7 +1,7 @@
 import { toHex } from "@harmoniclabs/uint8array-utils";
 import { MiniProtocol, isMiniProtocol, miniProtocolToNumber, miniProtocolToString } from "../MiniProtocol";
 import { SocketLike, WrappedSocket, isNode2NodeSocket, isWebSocketLike, wrapSocket } from "./SocketLike";
-import { MultiplexerHeaderInfos, unwrapMultiplexerMessage, wrapMultiplexerMessage } from "./multiplexerMessage";
+import { MultiplexerHeaderInfos, unwrapMultiplexerMessages, wrapMultiplexerMessage } from "./multiplexerMessage";
 
 const MAX_RECONNECT_ATTEPMTS = 3 as const;
 
@@ -99,26 +99,29 @@ export class Multiplexer
 
         function forwardMessage(chunk: Uint8Array)
         {
-            const { header, payload } = unwrapMultiplexerMessage( chunk );
-            if( !isMiniProtocol( header.protocol ) )
+            const messages = unwrapMultiplexerMessages( chunk );
+            for( const { header, payload } of messages )
             {
-                const errorCbs = eventListeners.error;
-                const err = new Error(
-                    "unwrapped Multiplexer header was not a mini protocol;\nmultiplexer chunk received: " + 
-                    toHex( Uint8Array.prototype.slice.call( chunk ) )
-                );
-
-                for( const cb of errorCbs )
+                if( !isMiniProtocol( header.protocol ) )
                 {
-                    void cb( err );
+                    const errorCbs = eventListeners.error;
+                    const err = new Error(
+                        "unwrapped Multiplexer header was not a mini protocol;\nmultiplexer chunk received: " + 
+                        toHex( Uint8Array.prototype.slice.call( chunk ) )
+                    );
+    
+                    for( const cb of errorCbs )
+                    {
+                        void cb( err );
+                    }
+                    return;
                 }
-                return;
-            }
-
-            const listeners = eventListeners[header.protocol];
-            for( const cb of listeners )
-            {
-                void cb( payload, header );
+    
+                const listeners = eventListeners[header.protocol];
+                for( const cb of listeners )
+                {
+                    void cb( payload, header );
+                }
             }
         }
 

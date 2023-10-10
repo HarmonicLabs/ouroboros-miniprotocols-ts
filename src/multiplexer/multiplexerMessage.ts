@@ -77,12 +77,17 @@ export function wrapMultiplexerMessage(
 const agencyMask = 0x8000; // ( 1 << 15 )
 const protoclMask  = 0x7fff; // ~agencyMask & 0xffff;
 
-export function unwrapMultiplexerMessage(
-    message: Uint8Array
-): {
+export type MultiplexerMessage = {
     header: MultiplexerHeader,
     payload: Uint8Array
-}
+};
+
+/**
+ * @deprecated use `unwrapMultiplexerMessages`
+ */
+export function unwrapMultiplexerMessage(
+    message: Uint8Array
+): MultiplexerMessage
 {
     const view = new DataView( message.buffer );
     const agencyAndProtocol = view.getUint16( 4, false );
@@ -96,4 +101,30 @@ export function unwrapMultiplexerMessage(
         },
         payload: message.slice( 8, 8 + payloadLen )
     };
+}
+
+export function unwrapMultiplexerMessages(
+    message: Uint8Array
+): MultiplexerMessage[]
+{
+    const messages: MultiplexerMessage[] = [];
+    while( message.length >= 8 )
+    {
+        const view = new DataView( message.buffer );
+        const agencyAndProtocol = view.getUint16( 4, false );
+        const payloadLen = view.getUint16( 6, false );
+
+        messages.push({
+            header: {
+                transmissionTime: view.getUint32( 0, false ),
+                hasAgency: (agencyAndProtocol & agencyMask) > 0,
+                protocol: agencyAndProtocol & protoclMask,
+                payloadLength: payloadLen
+            },
+            payload: message.slice( 8, 8 + payloadLen )
+        });
+
+        message = message.slice( 8 + payloadLen );
+    }
+    return messages
 }
