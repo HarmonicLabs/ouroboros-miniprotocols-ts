@@ -121,10 +121,10 @@ export function unwrapMultiplexerMessages(
                 protocol: agencyAndProtocol & protoclMask,
                 payloadLength: payloadLen
             },
-            payload: message.slice( 8, 8 + payloadLen )
+            payload: Uint8Array.prototype.slice.call( message, 8, 8 + payloadLen )
         });
 
-        message = message.slice( 8 + payloadLen );
+        message = Uint8Array.prototype.slice.call( message, 8 + payloadLen );
     }
     return messages
 }

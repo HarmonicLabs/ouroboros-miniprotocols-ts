@@ -14,6 +14,7 @@ import { toHex } from "@harmoniclabs/uint8array-utils";
 import { ChainSyncMessageDone } from "./ChainSyncMessageDone";
 import EventEmitter from "events";
 import { AddEvtListenerOpts } from "../../common/AddEvtListenerOpts";
+import { ErrorListener } from "../../common/ErrorListener";
 
 const roDescr = Object.freeze({
     writable: false,
@@ -137,7 +138,7 @@ export interface IChainSyncClient {
     off( eventName: "intersectFound"       , listener: ChainSyncClientEvtListener ): this
     off( eventName: "intersectNotFound"    , listener: ChainSyncClientEvtListener ): this
     off( eventName: "awaitReply"           , listener: ChainSyncClientEvtListener ): this
-    off( eventName: "error"                , listener: (err: Error) => void ): this
+    off( eventName: "error"                , listener: ErrorListener ): this
     off( eventName: ChainSyncClientEvtName , listener: ChainSyncClientEvtListener ): this
 
     removeAllListeners( event?: ChainSyncClientEvtName | "error" ): this

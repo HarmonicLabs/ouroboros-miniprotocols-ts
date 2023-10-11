@@ -15,6 +15,16 @@ export enum MiniProtocol {
 
 Object.freeze( MiniProtocol );
 
+export type MiniProtocolStr
+    = "Handshake"
+    | "ChainSync"
+    | "LocalChainSync"
+    | "BlockFetch"
+    | "TxSubmission"
+    | "LocalTxSubmission"
+    | "LocalStateQuery"
+    | "KeepAlive";
+
 export function miniProtocolToNumber( protocol: number | string ): number
 {
     return typeof protocol === "string" ? MiniProtocol[protocol as any] as any as number : Number( protocol );

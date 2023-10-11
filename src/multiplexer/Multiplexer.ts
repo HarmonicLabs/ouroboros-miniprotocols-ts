@@ -1,7 +1,8 @@
 import { toHex } from "@harmoniclabs/uint8array-utils";
-import { MiniProtocol, isMiniProtocol, miniProtocolToNumber, miniProtocolToString } from "../MiniProtocol";
+import { MiniProtocol, MiniProtocolStr, isMiniProtocol, miniProtocolToNumber, miniProtocolToString } from "../MiniProtocol";
 import { SocketLike, WrappedSocket, isNode2NodeSocket, isWebSocketLike, wrapSocket } from "./SocketLike";
-import { MultiplexerHeaderInfos, unwrapMultiplexerMessages, wrapMultiplexerMessage } from "./multiplexerMessage";
+import { MultiplexerHeader, MultiplexerHeaderInfos, unwrapMultiplexerMessages, wrapMultiplexerMessage } from "./multiplexerMessage";
+import { ErrorListener } from "../common/ErrorListener";
 
 const MAX_RECONNECT_ATTEPMTS = 3 as const;
 
@@ -11,7 +12,7 @@ const roDescr = {
     configurable: false
 };
 
-export type MultiplexerEvtListener = ( payload: Uint8Array, header: MultiplexerHeaderInfos ) => void;
+export type MultiplexerEvtListener = ( payload: Uint8Array, header: MultiplexerHeader ) => void;
 
 type MultiplexerEvtListeners = {
     [MiniProtocol.BlockFetch]: MultiplexerEvtListener[]
@@ -39,6 +40,18 @@ export type MultiplexerCloseOptions = {
     closeSocket: boolean
 }
 
+export type MplexerEvtName = "error" | MiniProtocolStr | MiniProtocol;
+
+export type AnyMplexerListener = MultiplexerEvtListener | ErrorListener
+
+export type MplexerListenerOf<Evt extends MplexerEvtName> = 
+    Evt extends "error" ? ErrorListener :
+    MultiplexerEvtListener;
+
+export type ArgsOf<Evt extends MplexerEvtName> = 
+    Evt extends "error" ? [ err: Error ] :
+    [ payload: Uint8Array, header: MultiplexerHeader ];
+
 export class Multiplexer
 {
     readonly socket: WrappedSocket
@@ -46,11 +59,28 @@ export class Multiplexer
 
     readonly clearListeners: ( protocol?: MiniProtocol ) => void
 
+    addEventListener    : <Evt extends MplexerEvtName>( evt: Evt, listener: MplexerListenerOf<Evt> ) => void
+    addListener         : <Evt extends MplexerEvtName>( evt: Evt, listener: MplexerListenerOf<Evt> ) => void
+    on                  : <Evt extends MplexerEvtName>( evt: Evt, listener: MplexerListenerOf<Evt> ) => void
+    once                : <Evt extends MplexerEvtName>( evt: Evt, listener: MplexerListenerOf<Evt> ) => void
+    removeEventListener : <Evt extends MplexerEvtName>( evt: Evt, listener: MplexerListenerOf<Evt> ) => void
+    removeListener      : <Evt extends MplexerEvtName>( evt: Evt, listener: MplexerListenerOf<Evt> ) => void
+    off                 : <Evt extends MplexerEvtName>( evt: Evt, listener: MplexerListenerOf<Evt> ) => void
+    removeAllListeners  : <Evt extends MplexerEvtName>( evt?: Evt ) => void
+    emit                : <Evt extends MplexerEvtName>( evt: Evt, ...args: ArgsOf<Evt> ) => void
+    dispatchEvent       : <Evt extends MplexerEvtName>( evt: Evt, ...args: ArgsOf<Evt> ) => void
+
+    /** @deprecated */
     onHandshake!: ( cb: MultiplexerEvtListener ) => void
+    /** @deprecated */
     onChainSync!: ( cb: MultiplexerEvtListener ) => void
+    /** @deprecated */
     onBlockFetch!: ( cb: MultiplexerEvtListener ) => void
+    /** @deprecated */
     onTxSubmission!: ( cb: MultiplexerEvtListener ) => void
+    /** @deprecated */
     onLocalStateQuery!: ( cb: MultiplexerEvtListener ) => void
+    /** @deprecated */
     onKeepAlive!: ( cb: MultiplexerEvtListener ) => void
 
     send: ( payload: Uint8Array, header: MultiplexerHeaderInfos ) => void;

@@ -1,0 +1,1 @@
+export type ErrorListener = (err: Error) => void;
