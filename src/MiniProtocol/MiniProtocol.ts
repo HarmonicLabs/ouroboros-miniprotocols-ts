@@ -25,6 +25,44 @@ export type MiniProtocolStr
     | "LocalStateQuery"
     | "KeepAlive";
 
+export function isMiniProtocolStr( thing: any ): thing is MiniProtocolStr
+{
+    return (
+        thing === "Handshake"           ||
+        thing === "ChainSync"           ||
+        thing === "LocalChainSync"      ||
+        thing === "BlockFetch"          ||
+        thing === "TxSubmission"        ||
+        thing === "LocalTxSubmission"   ||
+        thing === "LocalStateQuery"     ||
+        thing === "KeepAlive"
+    );
+}
+
+export type MiniProtocolNum
+    = 0 // "Handshake"
+    | 2 // "ChainSync"
+    | 5 // "LocalChainSync"
+    | 3 // "BlockFetch"
+    | 4 // "TxSubmission"
+    | 6 // "LocalTxSubmission"
+    | 7 // "LocalStateQuery"
+    | 8 // "KeepAlive";
+
+export function isMiniProtocolNum( thing: any ): thing is MiniProtocolNum
+{
+    return (
+        thing === 0 || // "Handshake"
+        thing === 2 || // "ChainSync"
+        thing === 5 || // "LocalChainSync"
+        thing === 3 || // "BlockFetch"
+        thing === 4 || // "TxSubmission"
+        thing === 6 || // "LocalTxSubmission"
+        thing === 7 || // "LocalStateQuery"
+        thing === 8    // "KeepAlive";
+    );
+}
+
 export function miniProtocolToNumber( protocol: number | string ): number
 {
     return typeof protocol === "string" ? MiniProtocol[protocol as any] as any as number : Number( protocol );

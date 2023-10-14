@@ -1,11 +1,35 @@
 
+localStateQueryMessage
+    = msgAcquire
+    / msgAcquired
+    / msgFailure
+    / msgQuery
+    / msgResult
+    / msgRelease
+    / msgReAcquire
+    / lsqMsgDone
+
+acquireFailurePointTooOld = 0
+acquireFailurePointNotOnChain = 1
+
+failure = acquireFailurePointTooOld / acquireFailurePointNotOnChain
+
+msgAcquire = [0 , point ] / [ 8 ]
+msgAcquired = [ 1 ]
+msgFailure = [2 , failure ]
+msgQuery = [3 , query ]
+msgResult = [4 , result ]
+msgRelease = [5]
+msgReAcquire = [6 , point ] / [ 9 ]; `[9]` is shortcut for tip
+lsqMsgDone = [7]
+
 query 
     = qrySystemStartDate
     / qryBlockNumber
     / qryBlockHeaderHash
     / qryEraHistory
     / qryCurrentEra
-    / queryEra
+    / queryEra ; queries wrapped in era request (eg. utxos queries etc... )
 
 ; indipendend by current block
 qrySystemStartDate = [1]
@@ -60,7 +84,7 @@ _queryEra
     / reqProtocolParams
     / reqProtocolParamsUpdate
     / reqStakeDistribution
-    / reqUtxoByAddr
+    / queryUtxoByAddrs
 
 ; requests block header hash of the currently acquired block
 reqBlockHeaderHash = [0]
@@ -131,8 +155,10 @@ reqStakeDistributionResult = [
     ]}
 ]
 
+
+
 ; requests utxo at an addrress of the currently acquired block
-reqUtxoByAddr = [ 6 , #6.258([ * addr ]) ];
+queryUtxoByAddrs = [ 6 , #6.258([ * addr ]) ];
 utxoByAddrResult = [ utxoValues ]
 utxoValues = { * utxo => value }
 

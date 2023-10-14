@@ -287,7 +287,7 @@ export class ChainSyncClient
         {
             if( !isAnyChainSyncClientEvtName( eventName ) ) return self;
 
-            eventListeners[ eventName ].push( listener as any );
+            onceEventListeners[ eventName ].push( listener as any );
             return self;
         }
         function addEventListener( eventName: AnyChainSyncClientEvtName, listener: ChainSyncClientEvtListener, opts?: AddEvtListenerOpts ): typeof self
@@ -355,7 +355,7 @@ export class ChainSyncClient
         let prevBytes: Uint8Array | undefined = undefined;
         const queque: ChainSyncMessage[] = [];
 
-        multiplexer.onChainSync( chunk => {
+        multiplexer.on( MiniProtocol.ChainSync, chunk => {
 
             if( !hasEventListeners() ) return;
 

@@ -6,3 +6,5 @@ export * from "./QryQuery";
 export * from "./QryReAcquire";
 export * from "./QryRelease";
 export * from "./QryResult";
+export * from "./QryMessage";
+export * from "./LocalStateQueryClient";

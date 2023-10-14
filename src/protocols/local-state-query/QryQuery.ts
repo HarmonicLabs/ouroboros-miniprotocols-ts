@@ -5,7 +5,7 @@ export interface IQryQuery {
     /**
      * not fixed in the specification;
      * 
-     * check `query.cddl` for calid cardano queries
+     * check `query.cddl` for valid cardano queries
     **/
     query: CborObj
 }

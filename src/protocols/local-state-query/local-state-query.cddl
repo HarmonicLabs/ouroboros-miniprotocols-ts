@@ -1,0 +1,24 @@
+
+localStateQueryMessage
+    = msgAcquire
+    / msgAcquired
+    / msgFailure
+    / msgQuery
+    / msgResult
+    / msgRelease
+    / msgReAcquire
+    / lsqMsgDone
+
+acquireFailurePointTooOld = 0
+acquireFailurePointNotOnChain = 1
+
+failure = acquireFailurePointTooOld / acquireFailurePointNotOnChain
+
+msgAcquire = [0 , point ] / [ 8 ]
+msgAcquired = [ 1 ]
+msgFailure = [2 , failure ]
+msgQuery = [3 , query ]; see `query.cddl`
+msgResult = [4 , result ]
+msgRelease = [5]
+msgReAcquire = [6 , point ] / [ 9 ]; `[9]` is shortcut for tip
+lsqMsgDone = [7]

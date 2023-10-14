@@ -1,8 +1,9 @@
 import { toHex } from "@harmoniclabs/uint8array-utils";
-import { MiniProtocol, MiniProtocolStr, isMiniProtocol, miniProtocolToNumber, miniProtocolToString } from "../MiniProtocol";
+import { MiniProtocol, MiniProtocolNum, MiniProtocolStr, isMiniProtocol, isMiniProtocolNum, isMiniProtocolStr, miniProtocolToNumber, miniProtocolToString } from "../MiniProtocol";
 import { SocketLike, WrappedSocket, isNode2NodeSocket, isWebSocketLike, wrapSocket } from "./SocketLike";
 import { MultiplexerHeader, MultiplexerHeaderInfos, unwrapMultiplexerMessages, wrapMultiplexerMessage } from "./multiplexerMessage";
 import { ErrorListener } from "../common/ErrorListener";
+import { AddEvtListenerOpts } from "../common/AddEvtListenerOpts";
 
 const MAX_RECONNECT_ATTEPMTS = 3 as const;
 
@@ -40,7 +41,16 @@ export type MultiplexerCloseOptions = {
     closeSocket: boolean
 }
 
-export type MplexerEvtName = "error" | MiniProtocolStr | MiniProtocol;
+export type MplexerEvtName = "error" | MiniProtocolStr | MiniProtocolNum;
+
+export function isMplexerEvtName( thing: any ): thing is MplexerEvtName
+{
+    return (
+        thing === "error" ||
+        isMiniProtocolStr( thing ) ||
+        isMiniProtocolNum( thing )
+    )
+}
 
 export type AnyMplexerListener = MultiplexerEvtListener | ErrorListener
 
@@ -59,16 +69,16 @@ export class Multiplexer
 
     readonly clearListeners: ( protocol?: MiniProtocol ) => void
 
-    addEventListener    : <Evt extends MplexerEvtName>( evt: Evt, listener: MplexerListenerOf<Evt> ) => void
-    addListener         : <Evt extends MplexerEvtName>( evt: Evt, listener: MplexerListenerOf<Evt> ) => void
-    on                  : <Evt extends MplexerEvtName>( evt: Evt, listener: MplexerListenerOf<Evt> ) => void
-    once                : <Evt extends MplexerEvtName>( evt: Evt, listener: MplexerListenerOf<Evt> ) => void
-    removeEventListener : <Evt extends MplexerEvtName>( evt: Evt, listener: MplexerListenerOf<Evt> ) => void
-    removeListener      : <Evt extends MplexerEvtName>( evt: Evt, listener: MplexerListenerOf<Evt> ) => void
-    off                 : <Evt extends MplexerEvtName>( evt: Evt, listener: MplexerListenerOf<Evt> ) => void
-    removeAllListeners  : <Evt extends MplexerEvtName>( evt?: Evt ) => void
-    emit                : <Evt extends MplexerEvtName>( evt: Evt, ...args: ArgsOf<Evt> ) => void
-    dispatchEvent       : <Evt extends MplexerEvtName>( evt: Evt, ...args: ArgsOf<Evt> ) => void
+    addEventListener    : <Evt extends MplexerEvtName>( evt: Evt, listener: MplexerListenerOf<Evt>, opts?: AddEventListenerOptions ) => this
+    addListener         : <Evt extends MplexerEvtName>( evt: Evt, listener: MplexerListenerOf<Evt> ) => this
+    on                  : <Evt extends MplexerEvtName>( evt: Evt, listener: MplexerListenerOf<Evt> ) => this
+    once                : <Evt extends MplexerEvtName>( evt: Evt, listener: MplexerListenerOf<Evt> ) => this
+    removeEventListener : <Evt extends MplexerEvtName>( evt: Evt, listener: MplexerListenerOf<Evt> ) => this
+    removeListener      : <Evt extends MplexerEvtName>( evt: Evt, listener: MplexerListenerOf<Evt> ) => this
+    off                 : <Evt extends MplexerEvtName>( evt: Evt, listener: MplexerListenerOf<Evt> ) => this
+    removeAllListeners  : <Evt extends MplexerEvtName>( evt?: Evt ) => this
+    emit                : <Evt extends MplexerEvtName>( evt: Evt, ...args: ArgsOf<Evt> ) => boolean
+    dispatchEvent       : <Evt extends MplexerEvtName>( evt: Evt, ...args: ArgsOf<Evt> ) => boolean
 
     /** @deprecated */
     onHandshake!: ( cb: MultiplexerEvtListener ) => void
@@ -90,6 +100,7 @@ export class Multiplexer
 
     constructor( cfg: MultiplexerConfig )
     {
+        const self = this
         const reconnect = cfg.connect;
         const socketLike = reconnect();
         let socket = wrapSocket( socketLike, reconnect );
@@ -101,6 +112,37 @@ export class Multiplexer
             {
                 socket = wrapSocket( socket.reconnect(), reconnect );
             }
+        }
+
+        function normalizeEventName( evt: MplexerEvtName ): "error" | MiniProtocol
+        {
+            if( !isMplexerEvtName( evt ) )
+            {
+                dispatchEvent( "error", new Error("unknown multiplexer event: " + evt));
+                return "error";
+            }
+            if( evt === "error" ) return evt;
+            evt = miniProtocolToNumber( evt ) as MiniProtocolNum;
+
+            if(
+                evt === MiniProtocol.Handshake          ||
+                evt === MiniProtocol.BlockFetch         ||
+                evt === MiniProtocol.LocalStateQuery    ||
+                evt === MiniProtocol.KeepAlive
+            ) return evt;
+
+            if( isN2N )
+            {
+                if( evt === MiniProtocol.LocalChainSync )       evt = MiniProtocol.ChainSync;
+                if( evt === MiniProtocol.LocalTxSubmission )    evt = MiniProtocol.TxSubmission;
+            }
+            else // node-to-client
+            {
+                if( evt === MiniProtocol.ChainSync )    evt = MiniProtocol.LocalChainSync;
+                if( evt === MiniProtocol.TxSubmission ) evt = MiniProtocol.LocalTxSubmission;
+            }
+
+            return evt;
         }
 
         const eventListeners: MultiplexerEvtListeners = {
@@ -115,15 +157,23 @@ export class Multiplexer
             error: []
         };
 
+        const onceEventListeners: MultiplexerEvtListeners = {
+            [MiniProtocol.Handshake]: [],
+            [MiniProtocol.ChainSync]: [],
+            [MiniProtocol.LocalChainSync]: [],
+            [MiniProtocol.BlockFetch]: [],
+            [MiniProtocol.TxSubmission]: [],
+            [MiniProtocol.LocalTxSubmission]: [],
+            [MiniProtocol.LocalStateQuery]: [],
+            [MiniProtocol.KeepAlive]: [],
+            error: []
+        };
+
         function handleSocketError( thing: Error | Event ): void
         {
-            const errorCbs = eventListeners.error;
             const err = new Error("socket error");
             (err as any).data = thing;
-            for( const cb of errorCbs )
-            {
-                void cb( err );
-            }
+            dispatchEvent("error", err);
             return;
         }
 
@@ -140,29 +190,24 @@ export class Multiplexer
                         toHex( Uint8Array.prototype.slice.call( chunk ) )
                     );
     
-                    for( const cb of errorCbs )
-                    {
-                        void cb( err );
-                    }
+                    dispatchEvent( "error", err )
                     return;
                 }
     
-                const listeners = eventListeners[header.protocol];
-                for( const cb of listeners )
-                {
-                    void cb( payload, header );
-                }
+                dispatchEvent( header.protocol, payload, header );
             }
         }
 
-        function clearListeners( protocol?: MiniProtocol | "error" ): void
+        function clearListeners( protocol?: MplexerEvtName ): void
         {
             if( protocol !== undefined )
             {
-                protocol = protocol === "error" ? protocol : miniProtocolToNumber( protocol );
+                protocol = protocol === "error" ? protocol : miniProtocolToNumber( protocol ) as MiniProtocol;
                 eventListeners[protocol].length = 0;
+                onceEventListeners[protocol].length = 0;
                 return;
             }
+            // else (protocol === undefined)
             eventListeners[MiniProtocol.Handshake]          .length = 0;
             eventListeners[MiniProtocol.ChainSync]          .length = 0;
             eventListeners[MiniProtocol.LocalChainSync]     .length = 0;
@@ -172,6 +217,16 @@ export class Multiplexer
             eventListeners[MiniProtocol.LocalStateQuery]    .length = 0;
             eventListeners[MiniProtocol.KeepAlive]          .length = 0;
             eventListeners.error                            .length = 0;
+
+            onceEventListeners[MiniProtocol.Handshake]          .length = 0;
+            onceEventListeners[MiniProtocol.ChainSync]          .length = 0;
+            onceEventListeners[MiniProtocol.LocalChainSync]     .length = 0;
+            onceEventListeners[MiniProtocol.BlockFetch]         .length = 0;
+            onceEventListeners[MiniProtocol.TxSubmission]       .length = 0;
+            onceEventListeners[MiniProtocol.LocalTxSubmission]  .length = 0;
+            onceEventListeners[MiniProtocol.LocalStateQuery]    .length = 0;
+            onceEventListeners[MiniProtocol.KeepAlive]          .length = 0;
+            onceEventListeners.error                            .length = 0;
         }
 
         socket.on("close", reconnectSocket );
@@ -221,10 +276,12 @@ export class Multiplexer
             }
         }
 
+        /** @deprecated */
         function onHandshake( cb: MultiplexerEvtListener )
         {
             eventListeners[MiniProtocol.Handshake].push( cb );
         }
+        /** @deprecated */
         function onChainSync( cb: MultiplexerEvtListener )
         {
             eventListeners[
@@ -233,10 +290,12 @@ export class Multiplexer
                 MiniProtocol.LocalChainSync
             ].push( cb );
         }
+        /** @deprecated */
         function onBlockFetch( cb: MultiplexerEvtListener )
         {
             eventListeners[MiniProtocol.BlockFetch].push( cb );
         }
+        /** @deprecated */
         function onTxSubmission( cb: MultiplexerEvtListener )
         {
             eventListeners[
@@ -245,13 +304,91 @@ export class Multiplexer
                 MiniProtocol.LocalTxSubmission
             ].push( cb );
         }
+        /** @deprecated */
         function onLocalStateQuery( cb: MultiplexerEvtListener )
         {
             eventListeners[MiniProtocol.LocalStateQuery].push( cb );
         }
+        /** @deprecated */
         function onKeepAlive( cb: MultiplexerEvtListener )
         {
             eventListeners[MiniProtocol.KeepAlive].push( cb );
+        }
+
+        function addEventListenerOnce<Evt extends MplexerEvtName>( evt: Evt, listener: MplexerListenerOf<Evt> ): typeof self
+        {
+            if( !isMplexerEvtName( evt ) ) return self;
+            evt = normalizeEventName( evt ) as Evt;
+
+            if( evt === "error" )
+            {
+                onceEventListeners.error.push( listener as ErrorListener );
+                return self;
+            }
+
+            evt = miniProtocolToNumber( evt ) as any;
+
+            onceEventListeners[ evt as MiniProtocol ].push( listener as any );
+            return self;
+        }
+        function addEventListener<Evt extends MplexerEvtName>( evt: Evt, listener: MplexerListenerOf<Evt>, opts?: AddEvtListenerOpts ): typeof self
+        {
+            if( opts?.once ) return addEventListenerOnce( evt, listener );
+
+            if( !isMplexerEvtName( evt ) ) return self;
+            evt = normalizeEventName( evt ) as Evt;
+
+            if( evt === "error" )
+            {
+                eventListeners.error.push( listener as ErrorListener );
+                return self;
+            }
+
+            evt = miniProtocolToNumber( evt ) as any;
+
+            eventListeners[ evt as MiniProtocol ].push( listener as any );
+            return self;
+        }
+        function removeEventListener<Evt extends MplexerEvtName>( evt: Evt, listener: MplexerListenerOf<Evt> ): typeof self
+        {
+            if( !isMplexerEvtName( evt ) ) return self;
+            evt = normalizeEventName( evt ) as Evt;
+
+            if( evt === "error" )
+            {
+                eventListeners.error = eventListeners.error.filter( fn => fn !== listener  );
+                onceEventListeners.error = eventListeners.error.filter( fn => fn !== listener  );
+                return self;
+            }
+
+            evt = miniProtocolToNumber( evt ) as any;
+
+            eventListeners[ evt as MiniProtocol ] = eventListeners[ evt as MiniProtocol ].filter( fn => fn !== listener );
+            onceEventListeners[ evt as MiniProtocol ] = eventListeners[ evt as MiniProtocol ].filter( fn => fn !== listener );
+            return self;
+        }
+        function dispatchEvent<Evt extends MplexerEvtName>( evt: Evt, ...args: ArgsOf<Evt> ): boolean
+        {
+            // console.log( eventName, msg );
+            if( !isMplexerEvtName( evt ) ) return true;
+            evt = normalizeEventName( evt ) as Evt;
+
+            const listeners = eventListeners[ evt as MiniProtocol ];
+            const nListeners = listeners.length;
+            for(let i = 0; i < nListeners; i++)
+            {
+                // @ts-ignore
+                listeners[i]( ...args );
+            }
+
+            const onceListeners = onceEventListeners[evt as MiniProtocol];
+            while( onceListeners.length > 0 )
+            {
+                // @ts-ignore
+                onceListeners.shift()!( ...args );
+            }
+
+            return true;
         }
 
         Object.defineProperties(
@@ -263,50 +400,27 @@ export class Multiplexer
                     enumerable: true,
                     configurable: false
                 },
-                isN2N: {
-                    value: isN2N,
-                    ...roDescr
-                },
-                send: {
-                    value: send,
-                    ...roDescr
-                },
-                close: {
-                    value: close,
-                    ...roDescr
-                },
-                isClosed: {
-                    value: isClosed,
-                    ...roDescr
-                },
-                onHandshake: {
-                    value: onHandshake,
-                    ...roDescr
-                },
-                onChainSync: {
-                    value: onChainSync,
-                    ...roDescr
-                },
-                onBlockFetch: {
-                    value: onBlockFetch,
-                    ...roDescr
-                },
-                onTxSubmission: {
-                    value: onTxSubmission,
-                    ...roDescr
-                },
-                onLocalStateQuery: {
-                    value: onLocalStateQuery,
-                    ...roDescr
-                },
-                onKeepAlive: {
-                    value: onKeepAlive,
-                    ...roDescr
-                },
-                clearListeners: {
-                    value: clearListeners,
-                    ...roDescr
-                }
+                isN2N:                  { value: isN2N, ...roDescr },
+                send:                   { value: send, ...roDescr },
+                close:                  { value: close, ...roDescr },
+                isClosed:               { value: isClosed, ...roDescr },
+                onHandshake:            { value: onHandshake, ...roDescr },
+                onChainSync:            { value: onChainSync, ...roDescr },
+                onBlockFetch:           { value: onBlockFetch, ...roDescr },
+                onTxSubmission:         { value: onTxSubmission, ...roDescr },
+                onLocalStateQuery:      { value: onLocalStateQuery, ...roDescr },
+                onKeepAlive:            { value: onKeepAlive, ...roDescr },
+                clearListeners:         { value: clearListeners, ...roDescr },
+                addEventListener:       { value: addEventListener, ...roDescr },
+                addListener:            { value: addEventListener, ...roDescr },
+                on:                     { value: addEventListener, ...roDescr },
+                once:                   { value: addEventListenerOnce, ...roDescr },
+                removeEventListener:    { value: removeEventListener, ...roDescr },
+                removeListener:         { value: removeEventListener, ...roDescr },
+                off:                    { value: removeEventListener, ...roDescr },
+                removeAllListeners:     { value: clearListeners, ...roDescr },
+                emit:                   { value: dispatchEvent, ...roDescr },
+                dispatchEvent:          { value: dispatchEvent, ...roDescr },
             }
         );
     }
