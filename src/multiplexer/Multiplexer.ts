@@ -24,6 +24,7 @@ type MultiplexerEvtListeners = {
     [MiniProtocol.LocalStateQuery]: MultiplexerEvtListener[]
     [MiniProtocol.LocalTxSubmission]: MultiplexerEvtListener[]
     [MiniProtocol.TxSubmission]: MultiplexerEvtListener[]
+    [MiniProtocol.LocalTxMonitor]: MultiplexerEvtListener[]
     error: (( err: Error ) => void)[]
 };
 
@@ -41,7 +42,7 @@ export type MultiplexerCloseOptions = {
     closeSocket: boolean
 }
 
-export type MplexerEvtName = "error" | MiniProtocolStr | MiniProtocolNum;
+export type MplexerEvtName = "error" | MiniProtocol | MiniProtocolStr | MiniProtocolNum;
 
 export function isMplexerEvtName( thing: any ): thing is MplexerEvtName
 {
@@ -154,6 +155,7 @@ export class Multiplexer
             [MiniProtocol.LocalTxSubmission]: [],
             [MiniProtocol.LocalStateQuery]: [],
             [MiniProtocol.KeepAlive]: [],
+            [MiniProtocol.LocalTxMonitor]: [],
             error: []
         };
 
@@ -166,6 +168,7 @@ export class Multiplexer
             [MiniProtocol.LocalTxSubmission]: [],
             [MiniProtocol.LocalStateQuery]: [],
             [MiniProtocol.KeepAlive]: [],
+            [MiniProtocol.LocalTxMonitor]: [],
             error: []
         };
 

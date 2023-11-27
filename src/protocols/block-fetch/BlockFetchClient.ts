@@ -176,14 +176,20 @@ export class BlockFetchClient
 
             while( true )
             {
+                const originalSTLimit = Error.stackTraceLimit;
+                Error.stackTraceLimit = 0;
                 try {
                     thing = Cbor.parseWithOffset( chunk );
                 }
                 catch
                 {
+                    Error.stackTraceLimit = originalSTLimit;
                     // assume the error is of "missing bytes";
                     prevBytes = chunk.slice();
                     break;
+                }
+                finally {
+                    Error.stackTraceLimit = originalSTLimit;
                 }
                 
                 offset = thing.offset;

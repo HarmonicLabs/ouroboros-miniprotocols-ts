@@ -7,3 +7,4 @@ export * from "./TxMonitorNextTx";
 export * from "./TxMonitorRelease";
 export * from "./TxMonitorReplyHasTx";
 export * from "./TxMonitorReplyNextTx";
+export * from "./LocalTxMonitorClient";

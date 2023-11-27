@@ -10,7 +10,8 @@ export enum MiniProtocol {
     /** Node-to-Client TxSubmission */
     LocalTxSubmission = 6,
     LocalStateQuery = 7,
-    KeepAlive = 8
+    KeepAlive = 8,
+    LocalTxMonitor = 9
 }
 
 Object.freeze( MiniProtocol );
@@ -23,7 +24,8 @@ export type MiniProtocolStr
     | "TxSubmission"
     | "LocalTxSubmission"
     | "LocalStateQuery"
-    | "KeepAlive";
+    | "KeepAlive"
+    | "LocalTxMonitor";
 
 export function isMiniProtocolStr( thing: any ): thing is MiniProtocolStr
 {
@@ -35,7 +37,8 @@ export function isMiniProtocolStr( thing: any ): thing is MiniProtocolStr
         thing === "TxSubmission"        ||
         thing === "LocalTxSubmission"   ||
         thing === "LocalStateQuery"     ||
-        thing === "KeepAlive"
+        thing === "KeepAlive"           ||
+        thing === "LocalTxMonitor"
     );
 }
 
@@ -47,7 +50,8 @@ export type MiniProtocolNum
     | 4 // "TxSubmission"
     | 6 // "LocalTxSubmission"
     | 7 // "LocalStateQuery"
-    | 8 // "KeepAlive";
+    | 8 // "KeepAlive"
+    | 9 // "LocalTxMonitor";
 
 export function isMiniProtocolNum( thing: any ): thing is MiniProtocolNum
 {
@@ -59,13 +63,14 @@ export function isMiniProtocolNum( thing: any ): thing is MiniProtocolNum
         thing === 4 || // "TxSubmission"
         thing === 6 || // "LocalTxSubmission"
         thing === 7 || // "LocalStateQuery"
-        thing === 8    // "KeepAlive";
+        thing === 8 || // "KeepAlive";
+        thing === 9    // "LocalTxMonitor";
     );
 }
 
-export function miniProtocolToNumber( protocol: number | string ): number
+export function miniProtocolToNumber( protocol: number | string ): MiniProtocolNum
 {
-    return typeof protocol === "string" ? MiniProtocol[protocol as any] as any as number : Number( protocol );
+    return typeof protocol === "string" ? MiniProtocol[protocol as any] as any as MiniProtocolNum : Number( protocol ) as MiniProtocolNum;
 }
 
 export function miniProtocolToString( protocol: number | string ): string
@@ -85,7 +90,8 @@ export function isMiniProtocol( protocol: number | string ): boolean
             protocol === MiniProtocol.LocalChainSync    ||
             protocol === MiniProtocol.LocalStateQuery   ||
             protocol === MiniProtocol.LocalTxSubmission ||
-            protocol === MiniProtocol.TxSubmission
+            protocol === MiniProtocol.TxSubmission      ||
+            protocol === MiniProtocol.LocalTxMonitor
         );
     }
     else if( typeof protocol === "string" )

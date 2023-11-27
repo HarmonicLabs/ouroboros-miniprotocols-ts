@@ -1,4 +1,4 @@
-import { Cbor, CborObj } from "@harmoniclabs/cbor";
+import { Cbor, CborArray, CborObj, CborUInt } from "@harmoniclabs/cbor";
 import { MiniProtocol } from "../../MiniProtocol";
 import { AddEvtListenerOpts } from "../../common/AddEvtListenerOpts";
 import { ErrorListener } from "../../common/ErrorListener";
@@ -297,11 +297,14 @@ export class LocalStateQueryClient
 
             while( offset < chunk.length )
             {
+                const originalSTLimit = Error.stackTraceLimit;
+                Error.stackTraceLimit = 0;
                 try {
                     thing = Cbor.parseWithOffset( chunk );
                 }
                 catch
                 {
+                    Error.stackTraceLimit = originalSTLimit;
                     // assume the error is of "missing bytes";
                     prevBytes = Uint8Array.prototype.slice.call( chunk );
                     break;
@@ -310,6 +313,7 @@ export class LocalStateQueryClient
                 offset = thing.offset;
 
                 // console.log( "msg byetes", offset, toHex( chunk.subarray( 0, offset ) ) );
+                // Error.stackTraceLimit = originalSTLimit;
                 try {
                     msg = localStateQueryMessageFromCborObj( thing.parsed );
                     // @ts-ignore Cannot assign to 'cborBytes' because it is a read-only property.ts(2540)
@@ -319,6 +323,9 @@ export class LocalStateQueryClient
                 }
                 catch (e)
                 {
+                    // before dispatch event
+                    Error.stackTraceLimit = originalSTLimit;
+
                     const err = typeof e?.message === "string" ? 
                         new Error(
                             e.message +
@@ -327,7 +334,11 @@ export class LocalStateQueryClient
                         new Error(
                             "\ndata: " + toHex( chunk ) + "\n"
                         )
+                        
                     dispatchEvent("error", err );
+                }
+                finally {
+                    Error.stackTraceLimit = 0;
                 }
 
                 if( offset < chunk.length )
@@ -380,5 +391,40 @@ export class LocalStateQueryClient
             lsqClientHeader
         );
         this.clearListeners();
+    }
+
+    requestCurrentEra( timeout?: number ): Promise<CborUInt>
+    {
+        return new Promise<CborUInt>( ( resolve, reject ) => {
+            let _timeout: any;
+
+            function resolveOnResult( { result }: QryResult )
+            {
+                typeof timeout === "number" && clearTimeout( _timeout );
+                resolve( result as CborUInt );
+            }
+
+            if( typeof timeout === "number" )
+            {
+                _timeout = setTimeout(() => {
+                    this.removeEventListener("result", resolveOnResult);
+                    reject()
+                }, timeout); 
+            }
+
+            this.once("result", resolveOnResult );
+    
+            this.query(
+                new CborArray([
+                    new CborUInt( 0 ),
+                    new CborArray([
+                        new CborUInt( 2 ),
+                        new CborArray([
+                            new CborUInt( 1 )
+                        ])
+                    ])
+                ])
+            );
+        });
     }
 }

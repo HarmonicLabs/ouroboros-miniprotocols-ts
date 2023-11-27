@@ -65,7 +65,8 @@ export class N2CRefuseReasonVersionMismatch
                     v instanceof CborUInt
                 )) throw new Error("invalid CBOR for 'OldN2CVersionNumber'");
                 
-                return forceOldN2CVersionNumber( v.num )
+                // return forceOldN2CVersionNumber( v.num )
+                return Number( v.num )
             })
         );
     }

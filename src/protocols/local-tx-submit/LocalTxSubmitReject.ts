@@ -2,24 +2,24 @@ import { CanBeCborString, Cbor, CborArray, CborNegInt, CborObj, CborString, Cbor
 import { isObject } from "@harmoniclabs/obj-utils";
 import { canBeInteger } from "../types/ints";
 
-export interface ILocalTxReject {
+export interface ILocalTxSubmitReject {
     reason: number | bigint
 }
 
-export function isILocalTxReject( stuff: any ): stuff is ILocalTxReject
+export function isILocalTxSubmitReject( stuff: any ): stuff is ILocalTxSubmitReject
 {
     return isObject( stuff ) && canBeInteger( stuff.reason );
 }
 
-export class LocalTxReject
-    implements ToCbor, ToCborObj, ILocalTxReject
+export class LocalTxSubmitReject
+    implements ToCbor, ToCborObj, ILocalTxSubmitReject
 {
     readonly reason: bigint;
 
-    constructor({ reason }: ILocalTxReject)
+    constructor({ reason }: ILocalTxSubmitReject)
     {
-        if(!isILocalTxReject({ reason }))
-        throw new Error("invalid interface for 'LocalTxReject'");
+        if(!isILocalTxSubmitReject({ reason }))
+        throw new Error("invalid interface for 'LocalTxSubmitReject'");
 
         Object.defineProperty(
             this, "reason", {
@@ -43,11 +43,11 @@ export class LocalTxReject
         ]);
     }
 
-    static fromCbor( cbor: CanBeCborString ): LocalTxReject
+    static fromCbor( cbor: CanBeCborString ): LocalTxSubmitReject
     {
-        return LocalTxReject.fromCborObj( Cbor.parse( forceCborString( cbor ) ) );
+        return LocalTxSubmitReject.fromCborObj( Cbor.parse( forceCborString( cbor ) ) );
     }
-    static fromCborObj( cbor: CborObj ): LocalTxReject
+    static fromCborObj( cbor: CborObj ): LocalTxSubmitReject
     {
         if(!(
             cbor instanceof CborArray &&
@@ -55,9 +55,9 @@ export class LocalTxReject
             cbor.array[0] instanceof CborUInt &&
             cbor.array[0].num === BigInt(2) &&
             (cbor.array[1] instanceof CborUInt || cbor.array[1] instanceof CborNegInt)
-        )) throw new Error("invalid CBOR for 'LocalTxReject");
+        )) throw new Error("invalid CBOR for 'LocalTxSubmitReject");
 
-        return new LocalTxReject({
+        return new LocalTxSubmitReject({
             reason: cbor.array[1].num
         });
     }

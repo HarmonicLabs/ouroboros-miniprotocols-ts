@@ -1,5 +1,6 @@
 import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
 import { isObject } from "@harmoniclabs/obj-utils";
+import { type } from "os";
 
 export interface ITxMonitorAcquire {}
 
@@ -7,6 +8,8 @@ export function isITxMonitorAcquire( stuff: any ): stuff is ITxMonitorAcquire
 {
     return isObject( stuff );
 }
+
+export type TxMonitorAwaitAquire = TxMonitorAcquire;
 
 export class TxMonitorAcquire
     implements ToCbor, ToCborObj, ITxMonitorAcquire

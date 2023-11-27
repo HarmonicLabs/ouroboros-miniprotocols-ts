@@ -1,24 +1,24 @@
 import { CanBeCborString, Cbor, CborArray, CborBytes, CborObj, CborString, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
 import { isObject } from "@harmoniclabs/obj-utils";
 
-export interface ILocalTxSubmit {
+export interface ILocalTxSubmitSubmit {
     tx: Uint8Array
 }
 
-export function isILocalTxSubmit( stuff: any ): stuff is ILocalTxSubmit
+export function isILocalTxSubmitSubmit( stuff: any ): stuff is ILocalTxSubmitSubmit
 {
     return isObject( stuff ) && isObject( stuff.tx ) && (stuff.tx instanceof Uint8Array);
 }
 
-export class LocalTxSubmit
-    implements ToCbor, ToCborObj, ILocalTxSubmit
+export class LocalTxSubmitSubmit
+    implements ToCbor, ToCborObj, ILocalTxSubmitSubmit
 {
     readonly tx: Uint8Array;
 
-    constructor({ tx }: ILocalTxSubmit)
+    constructor({ tx }: ILocalTxSubmitSubmit)
     {
         if(!(tx instanceof Uint8Array))
-        throw new Error("invalid interface for 'LocalTxSubmit'");
+        throw new Error("invalid interface for 'LocalTxSubmitSubmit'");
 
         Object.defineProperty(
             this, "tx", {
@@ -42,11 +42,11 @@ export class LocalTxSubmit
         ]);
     }
 
-    static fromCbor( cbor: CanBeCborString ): LocalTxSubmit
+    static fromCbor( cbor: CanBeCborString ): LocalTxSubmitSubmit
     {
-        return LocalTxSubmit.fromCborObj( Cbor.parse( forceCborString( cbor ) ) );
+        return LocalTxSubmitSubmit.fromCborObj( Cbor.parse( forceCborString( cbor ) ) );
     }
-    static fromCborObj( cbor: CborObj ): LocalTxSubmit
+    static fromCborObj( cbor: CborObj ): LocalTxSubmitSubmit
     {
         if(!(
             cbor instanceof CborArray &&
@@ -54,9 +54,9 @@ export class LocalTxSubmit
             cbor.array[0] instanceof CborUInt &&
             cbor.array[0].num === BigInt(0) &&
             cbor.array[1] instanceof CborBytes
-        )) throw new Error("invalid CBOR for 'LocalTxSubmit");
+        )) throw new Error("invalid CBOR for 'LocalTxSubmitSubmit");
 
-        return new LocalTxSubmit({
+        return new LocalTxSubmitSubmit({
             tx: cbor.array[1].buffer
         });
     }

@@ -1,15 +1,15 @@
 import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
 import { isObject } from "@harmoniclabs/obj-utils";
 
-export interface ILocalTxAccept {}
+export interface ILocalTxSubmitAccept {}
 
-export function isILocalTxAccept( stuff: any ): stuff is ILocalTxAccept
+export function isILocalTxSubmitAccept( stuff: any ): stuff is ILocalTxSubmitAccept
 {
     return isObject( stuff );
 }
 
-export class LocalTxAccept
-    implements ToCbor, ToCborObj, ILocalTxAccept
+export class LocalTxSubmitAccept
+    implements ToCbor, ToCborObj, ILocalTxSubmitAccept
 {
     constructor() {};
 
@@ -24,18 +24,18 @@ export class LocalTxAccept
         return new CborArray([ new CborUInt(1) ]);
     }
 
-    static fromCbor( cbor: CanBeCborString ): LocalTxAccept
+    static fromCbor( cbor: CanBeCborString ): LocalTxSubmitAccept
     {
-        return LocalTxAccept.fromCborObj( Cbor.parse( forceCborString( cbor ) ) );
+        return LocalTxSubmitAccept.fromCborObj( Cbor.parse( forceCborString( cbor ) ) );
     }
-    static fromCborObj( cbor: CborObj ): LocalTxAccept
+    static fromCborObj( cbor: CborObj ): LocalTxSubmitAccept
     {
         if(!(
             cbor instanceof CborArray &&
             cbor.array[0] instanceof CborUInt &&
             cbor.array[0].num === BigInt(1)
-        )) throw new Error("invalid CBOR for 'LocalTxAccept");
+        )) throw new Error("invalid CBOR for 'LocalTxSubmitAccept");
 
-        return new LocalTxAccept();
+        return new LocalTxSubmitAccept();
     }
 }
