@@ -1,0 +1,14 @@
+;
+; KeepAlive Mini-Protocol
+;
+
+keepAliveMessage = msgKeepAlive
+/ msgKeepAliveResponse
+/ msgDone
+
+msgKeepAlive = [0, cookie]
+msgKeepAliveResponse = [1, cookie]
+msgDone = [ 2 ]
+
+cookie = word16
+word16 = 0..65535

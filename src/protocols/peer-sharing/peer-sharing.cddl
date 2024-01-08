@@ -1,0 +1,21 @@
+peerSharingMessage = msgShareRequest
+/ msgSharePeers
+/ msgDone
+
+msgShareRequest = [0 , maxShareAmount ]
+msgSharePeers = [1 , peerAddresses ]
+msgDone = [ 2 ]
+
+peerAddresses = [ * peerAddress ]
+
+maxShareAmount = byte
+byte = 0..255
+
+peerAddress = [0 , word32 , portNumber ] ; IPv4 + portNumber
+/ [1 , word32 , word32 , word32 , word32 , flowInfo , scopeId , portNumber ] ; IPv6 + portNumber
+
+portNumber = word16
+flowInfo = word32
+scopeId = word32
+word16 = 0..65535
+word32 = 0..4294967295
