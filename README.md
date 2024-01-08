@@ -2,7 +2,7 @@
 
 ## What is this? Where am I?
 
-In this repository you'll find a typescript implementation of the [ouroboros networking protocol](https://input-output-hk.github.io/ouroboros-network/pdfs/network-spec/network-spec.pdf).
+In this repository you'll find a typescript implementation of the [ouroboros networking protocol](https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-spec/network-spec.pdf).
 
 To be precise here you find:
 - the data-types with respective CBOR encoding/decoding functions (`toCbor` methods and `fromCbor` static methods)
