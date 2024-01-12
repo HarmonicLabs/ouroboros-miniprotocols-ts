@@ -441,30 +441,64 @@ export class ChainSyncClient
         });
     }
 
-    requestNext(): void
+    requestNext(): Promise<ChainSyncRollForward | ChainSyncRollBackwards>
     {
-        this.mplexer.send(
-            new ChainSyncRequestNext().toCbor().toBuffer(),
+        const self = this;
+        return new Promise( resolve => {
+            function resolveForward( msg: ChainSyncRollForward )
             {
-                hasAgency: true,
-                protocol: this.mplexer.isN2N ? 
-                    MiniProtocol.ChainSync :
-                    MiniProtocol.LocalChainSync
+                self.removeEventListener("rollForward", resolveForward);
+                self.removeEventListener("rollBackwards", resolveBackwards);
+                resolve( msg );
             }
-        );
+            function resolveBackwards( msg: ChainSyncRollBackwards )
+            {
+                self.removeEventListener("rollForward", resolveForward);
+                self.removeEventListener("rollBackwards", resolveBackwards);
+                resolve( msg );
+            }
+            this.once("rollForward", resolveForward );
+            this.once("rollBackwards", resolveBackwards );
+            this.mplexer.send(
+                new ChainSyncRequestNext().toCbor().toBuffer(),
+                {
+                    hasAgency: true,
+                    protocol: this.mplexer.isN2N ? 
+                        MiniProtocol.ChainSync :
+                        MiniProtocol.LocalChainSync
+                }
+            );
+        });
     }
 
-    findIntersect( points: IChainPoint[] ): void
+    findIntersect( points: IChainPoint[] ): Promise<ChainSyncIntersectFound | ChainSyncIntersectNotFound>
     {
-        this.mplexer.send(
-            new ChainSyncFindIntersect({ points }).toCbor().toBuffer(),
+        const self = this;
+        return new Promise( resolve => {
+            function resolveFound( msg: ChainSyncIntersectFound )
             {
-                hasAgency: true,
-                protocol: this.mplexer.isN2N ? 
-                    MiniProtocol.ChainSync :
-                    MiniProtocol.LocalChainSync
+                self.removeEventListener("intersectFound", resolveFound);
+                self.removeEventListener("intersectNotFound", resolveNotFound);
+                resolve( msg );
             }
-        );
+            function resolveNotFound( msg: ChainSyncIntersectNotFound )
+            {
+                self.removeEventListener("intersectFound", resolveFound);
+                self.removeEventListener("intersectNotFound", resolveNotFound);
+                resolve( msg );
+            }
+            this.once("intersectFound", resolveFound );
+            this.once("intersectNotFound", resolveNotFound );
+            this.mplexer.send(
+                new ChainSyncFindIntersect({ points }).toCbor().toBuffer(),
+                {
+                    hasAgency: true,
+                    protocol: this.mplexer.isN2N ? 
+                        MiniProtocol.ChainSync :
+                        MiniProtocol.LocalChainSync
+                }
+            );
+        })
     }
 
     done(): void

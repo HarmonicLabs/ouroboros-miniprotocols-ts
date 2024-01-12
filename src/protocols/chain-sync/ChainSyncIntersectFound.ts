@@ -62,6 +62,16 @@ export class ChainSyncIntersectFound
             this.tip.toCborObj()
         ]);
     }
+    toCborBytes(): Uint8Array
+    {
+        if(!( this.cborBytes instanceof Uint8Array ))
+        {
+            // @ts-ignore Cannot assign to 'cborBytes' because it is a read-only property.
+            this.cborBytes = Cbor.encode( this.toCborObj() ).toBuffer();
+        }
+
+        return Uint8Array.prototype.slice.call( this.cborBytes );
+    }
 
     static fromCbor( cbor: CanBeCborString ): ChainSyncIntersectFound
     {

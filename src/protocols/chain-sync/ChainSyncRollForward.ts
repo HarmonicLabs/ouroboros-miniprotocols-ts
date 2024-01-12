@@ -3,7 +3,9 @@ import { ChainTip, IChainTip, isIChainTip } from "../types/ChainTip";
 import { getCborBytesDescriptor } from "./utils/getCborBytesDescriptor";
 
 export interface IChainSyncRollForward {
-    blockData: CborObj
+    data: CborObj
+    /** @deprecated */
+    blockData?: CborObj
     /** @deprecated */
     blockHeaderCbor?: CborObj,
     tip: IChainTip
@@ -14,31 +16,41 @@ export class ChainSyncRollForward
 {
     readonly cborBytes?: Uint8Array | undefined;
 
+    /** @deprecated use `data` instead */
     readonly blockData: CborObj;
-    /** @deprecated */
+    /** @deprecated use `data` instead */
     readonly blockHeaderCbor: CborObj;
+
+    readonly data: CborObj;
     readonly tip: ChainTip;
 
-    constructor({ blockData, tip }: IChainSyncRollForward)
+    constructor({ data, blockData, tip }: IChainSyncRollForward)
     {
+        data = data ?? blockData;
         if(!(
-            isCborObj( blockData ) &&
+            isCborObj( data ) &&
             isIChainTip( tip )
         )) throw new Error("invalid IChainSyncRollForward interface");
 
-        let _cborBytes: Uint8Array | undefined = undefined;
-        
         Object.defineProperties(
             this, {
                 cborBytes: getCborBytesDescriptor(),
-                blockData: {
-                    value: blockData,
+                data: {
+                    value: data,
                     writable: false,
                     enumerable: true,
                     configurable: false
                 },
+                // deprecated
+                blockData: {
+                    value: data,
+                    writable: false,
+                    enumerable: true,
+                    configurable: false
+                },
+                // deprecated
                 blockHeaderCbor: {
-                    value: blockData,
+                    value: data,
                     writable: false,
                     enumerable: true,
                     configurable: false
@@ -56,27 +68,37 @@ export class ChainSyncRollForward
     toJson()
     {
         return {
-            blockData: Cbor.encode( this.blockData ).toString(),
+            data: Cbor.encode( this.data ).toString(),
             tip: this.tip.toJson()
         };
     }
 
     toString(): string
     {
-        return `(roll forward: (header: ${Cbor.encode(this.blockData).toString()}) ${this.tip.toString()} )`
+        return `(roll forward: (header: ${Cbor.encode(this.data).toString()}) ${this.tip.toString()} )`
     }
 
     toCbor(): CborString
     {
-        return Cbor.encode( this.toCborObj() );
+        return new CborString( this.toCborBytes() );
     }
-    toCborObj()
+    toCborObj(): CborArray
     {
         return new CborArray([
             new CborUInt(2),
-            this.blockData,
+            this.data,
             this.tip.toCborObj()
         ]);
+    }
+    toCborBytes(): Uint8Array
+    {
+        if(!( this.cborBytes instanceof Uint8Array ))
+        {
+            // @ts-ignore Cannot assign to 'cborBytes' because it is a read-only property.
+            this.cborBytes = Cbor.encode( this.toCborObj() ).toBuffer();
+        }
+
+        return Uint8Array.prototype.slice.call( this.cborBytes );
     }
 
     static fromCbor( cbor: CanBeCborString ): ChainSyncRollForward
@@ -104,7 +126,7 @@ export class ChainSyncRollForward
         const [ _idx, headerCbor, tipCbor ] = cbor.array;
 
         return new ChainSyncRollForward({
-            blockData: headerCbor,
+            data: headerCbor,
             tip: ChainTip.fromCborObj( tipCbor )
         });
     }
