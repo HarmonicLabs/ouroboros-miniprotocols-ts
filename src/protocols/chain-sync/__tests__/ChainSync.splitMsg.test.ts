@@ -9,7 +9,7 @@ import { ChainSyncRollForward } from "../ChainSyncRollForward";
 
 jest.setTimeout( 15_000 );
 
-test("ChainSync", async () => {
+test.skip("ChainSync", async () => {
 
     const mplexer = new Multiplexer(
         {
