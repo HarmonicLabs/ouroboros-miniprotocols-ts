@@ -1,4 +1,4 @@
-import { CanBeCborString, Cbor, CborArray, CborBytes, CborObj, CborString, CborTag, CborUInt, ToCbor, ToCborObj, forceCborString, isCborObj } from "@harmoniclabs/cbor";
+import { CanBeCborString, Cbor, CborArray, CborBytes, CborObj, CborString, CborTag, CborUInt, LazyCborArray, ToCbor, ToCborObj, forceCborString, isCborObj } from "@harmoniclabs/cbor";
 import { ChainTip, IChainTip, isIChainTip } from "../types/ChainTip";
 import { getCborBytesDescriptor } from "./utils/getCborBytesDescriptor";
 
@@ -99,6 +99,18 @@ export class ChainSyncRollForward
         }
 
         return Uint8Array.prototype.slice.call( this.cborBytes );
+    }
+
+    /**
+     * @returns {Uint8Array}
+     * the bytes of `this.data` as present on `this.cborBytes`
+     * (using `Cbor.parseLazy`)
+     */
+    getDataBytes(): Uint8Array
+    {
+        const msgData = this.toCborBytes();
+        const lazy = Cbor.parseLazy( msgData ) as LazyCborArray;
+        return lazy.array[1];
     }
 
     static fromCbor( cbor: CanBeCborString ): ChainSyncRollForward

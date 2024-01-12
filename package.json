@@ -1,6 +1,6 @@
 {
   "name": "@harmoniclabs/ouroboros-miniprotocols-ts",
-  "version": "0.0.2-dev4",
+  "version": "0.0.2-dev5",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
@@ -12,7 +12,7 @@
     "test": "jest"
   },
   "dependencies": {
-    "@harmoniclabs/cbor": "^1.1.3-dev0",
+    "@harmoniclabs/cbor": "^1.1.4",
     "@harmoniclabs/obj-utils": "^1.0.0",
     "@harmoniclabs/uint8array-utils": "^1.0.0",
     "@types/node": "^20.1.7"
@@ -24,7 +24,7 @@
     "jest": "^29.6.2",
     "tsc-alias": "^1.8.7",
     "typescript": "^5.1.6"
-},
+  },
   "author": "Harmonic Laboratories",
   "license": "Apache-2.0",
   "funding": "https://github.com/sponsors/HarmonicLabs"
