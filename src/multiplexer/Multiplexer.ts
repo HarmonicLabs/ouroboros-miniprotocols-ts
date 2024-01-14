@@ -1,7 +1,7 @@
 import { toHex } from "@harmoniclabs/uint8array-utils";
 import { MiniProtocol, MiniProtocolNum, MiniProtocolStr, isMiniProtocol, isMiniProtocolNum, isMiniProtocolStr, miniProtocolToNumber, miniProtocolToString } from "../MiniProtocol";
 import { SocketLike, WrappedSocket, isNode2NodeSocket, isWebSocketLike, wrapSocket } from "./SocketLike";
-import { MultiplexerHeader, MultiplexerHeaderInfos, unwrapMultiplexerMessages, wrapMultiplexerMessage } from "./multiplexerMessage";
+import { MultiplexerHeader, MultiplexerHeaderInfos, MultiplexerMessage, unwrapMultiplexerMessages, wrapMultiplexerMessage } from "./multiplexerMessage";
 import { ErrorListener } from "../common/ErrorListener";
 import { AddEvtListenerOpts } from "../common/AddEvtListenerOpts";
 
@@ -180,20 +180,65 @@ export class Multiplexer<S extends SocketLike = SocketLike>
             return;
         }
 
-        function forwardMessage(chunk: Uint8Array)
+        let prevBytes: Uint8Array | undefined = undefined;
+        let prevHeader: MultiplexerHeader | undefined = undefined;
+
+        function forwardMessage( chunk: Uint8Array ): void
         {
-            const messages = unwrapMultiplexerMessages( chunk );
+            if( prevBytes )
+            {
+                const tmp = new Uint8Array( prevBytes.length + chunk.length );
+                tmp.set( prevBytes, 0 );
+                tmp.set( chunk, prevBytes.length );
+                chunk = tmp;
+                prevBytes = undefined;
+            }
+            
+            let messages: MultiplexerMessage[];
+            if( prevHeader )
+            {
+                if( chunk.length < prevHeader.payloadLength )
+                {
+                    // not enough bytes to cover message
+                    // remember for later
+                    prevBytes = chunk;
+
+                    // exit `forwardMessage` without sending any event.
+                    return;
+                }
+
+                messages = [
+                    {
+                        header: prevHeader,
+                        payload: Uint8Array.prototype.slice.call( chunk, 0, prevHeader.payloadLength )
+                    }
+                ];
+
+                chunk = Uint8Array.prototype.subarray.call( chunk, prevHeader.payloadLength, chunk.length );
+                prevHeader = undefined;
+            }
+            else messages = [];
+
+            // finally add any other message if present
+            messages = messages.concat( unwrapMultiplexerMessages( chunk ) );
+
             for( const { header, payload } of messages )
             {
+                if( header.payloadLength > payload.length )
+                {
+                    prevBytes = payload;
+                    prevHeader = header;
+                    break;
+                }
+
                 if( !isMiniProtocol( header.protocol ) )
                 {
-                    const errorCbs = eventListeners.error;
                     const err = new Error(
                         "unwrapped Multiplexer header was not a mini protocol;\nmultiplexer chunk received: " + 
                         toHex( Uint8Array.prototype.slice.call( chunk ) )
                     );
     
-                    dispatchEvent( "error", err )
+                    dispatchEvent( "error", err );
                     return;
                 }
     
@@ -377,15 +422,23 @@ export class Multiplexer<S extends SocketLike = SocketLike>
             evt = normalizeEventName( evt ) as Evt;
 
             const listeners = eventListeners[ evt as MiniProtocol ];
+            const onceListeners = onceEventListeners[evt as MiniProtocol];
+
             const nListeners = listeners.length;
+            const nOnceListeners = onceListeners.length;
+
+            if( evt === "error" && nListeners + nOnceListeners === 0 )
+            {
+                throw args[0] ?? new Error("unhandled error");
+            }
+
             for(let i = 0; i < nListeners; i++)
             {
                 // @ts-ignore
                 listeners[i]( ...args );
             }
 
-            const onceListeners = onceEventListeners[evt as MiniProtocol];
-            while( onceListeners.length > 0 )
+            while( nOnceListeners > 0 )
             {
                 // @ts-ignore
                 onceListeners.shift()!( ...args );

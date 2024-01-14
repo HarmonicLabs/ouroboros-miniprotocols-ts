@@ -1,3 +1,4 @@
+import { toHex } from "@harmoniclabs/uint8array-utils";
 import { MiniProtocol } from "../MiniProtocol";
 
 export interface MultiplexerHeaderInfos {
@@ -89,12 +90,11 @@ export function unwrapMultiplexerMessage(
     message: Uint8Array
 ): MultiplexerMessage
 {
-    const view = new DataView( message.buffer );
-    const agencyAndProtocol = view.getUint16( 4, false );
-    const payloadLen = view.getUint16( 6, false );
+    const agencyAndProtocol = message[4] << 8 | message[5];
+    const payloadLen = message[6] << 8 | message[7];
     return {
         header: {
-            transmissionTime: view.getUint32( 0, false ),
+            transmissionTime: (message[0] << 24) | (message[1] << 16) | (message[2] << 8) | message[3],
             hasAgency: (agencyAndProtocol & agencyMask) > 0,
             protocol: agencyAndProtocol & protoclMask,
             payloadLength: payloadLen
@@ -110,13 +110,15 @@ export function unwrapMultiplexerMessages(
     const messages: MultiplexerMessage[] = [];
     while( message.length >= 8 )
     {
-        const view = new DataView( message.buffer );
-        const agencyAndProtocol = view.getUint16( 4, false );
-        const payloadLen = view.getUint16( 6, false );
+        // bitwise opeartor (or and shift) implicitly convert to signed int32
+        // but these are 2 bytes long numbers, hence always positive
+        const agencyAndProtocol = message[4] << 8 | message[5];
+        const payloadLen = message[6] << 8 | message[7];
+        const uint32View = new Uint32Array( message.slice(4,8).buffer );
 
         messages.push({
             header: {
-                transmissionTime: view.getUint32( 0, false ),
+                transmissionTime: uint32View[0],
                 hasAgency: (agencyAndProtocol & agencyMask) > 0,
                 protocol: agencyAndProtocol & protoclMask,
                 payloadLength: payloadLen
