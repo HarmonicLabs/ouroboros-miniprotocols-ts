@@ -41,7 +41,7 @@ describe("multiplexerMessage", () => {
 
     test("", async () => {
 
-        // const socketData: Uint8Array[] = [];
+        const socketData: Uint8Array[] = [];
         // const mplexerMsgs: MultiplexerMessage[] = [];
         // const msgs: BlockFetchMessage[] = [];
 
@@ -54,7 +54,7 @@ describe("multiplexerMessage", () => {
         //         payload: new Uint8Array( payload )
         //     });
         // });
-        // mplexer.socket.on("data", data => socketData.push(data) );
+        mplexer.socket.on("data", data => socketData.push(data) );
 
         // client.on("startBatch", () => console.log("start"));
         // client.on("block", () => console.log("block"));
@@ -80,7 +80,7 @@ describe("multiplexerMessage", () => {
         // console.log( toHex( socketData[0] ) + toHex( socketData[1].slice( 0, 166 ) ) );
         // console.log( toHex( socketData[1].slice( 166 ) ) );
 // 
-        // console.log( unwrapMultiplexerMessages( socketData[1].slice( 166 ) ) );
+        console.log( unwrapMultiplexerMessages( socketData[1].slice( 166 ) ) );
         // console.log( toHex( socketData[1].slice( 166, 166 + 8 ) ) );
         // await new Promise<void>( resolve => {
 // 
