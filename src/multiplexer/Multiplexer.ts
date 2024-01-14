@@ -30,9 +30,9 @@ type MultiplexerEvtListeners = {
 
 export type MultiplexerProtocolType = "node-to-node" | "node-to-client";
 
-export interface MultiplexerConfig {
+export interface MultiplexerConfig<S extends SocketLike> {
     protocolType: MultiplexerProtocolType,
-    connect: () => SocketLike
+    connect: () => S
 }
 
 export type MultiplexerCloseOptions = {
@@ -63,9 +63,9 @@ export type ArgsOf<Evt extends MplexerEvtName> =
     Evt extends "error" ? [ err: Error ] :
     [ payload: Uint8Array, header: MultiplexerHeader ];
 
-export class Multiplexer
+export class Multiplexer<S extends SocketLike = SocketLike>
 {
-    readonly socket: WrappedSocket
+    readonly socket: WrappedSocket<S>
     readonly isN2N: boolean
 
     readonly clearListeners: ( protocol?: MiniProtocol ) => void
@@ -99,7 +99,7 @@ export class Multiplexer
     close: ( options?: MultiplexerCloseOptions ) => void;
     isClosed: () => boolean
 
-    constructor( cfg: MultiplexerConfig )
+    constructor( cfg: MultiplexerConfig<S> )
     {
         const self = this
         const reconnect = cfg.connect;

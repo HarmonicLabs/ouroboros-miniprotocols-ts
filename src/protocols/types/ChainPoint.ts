@@ -21,7 +21,7 @@ export interface IChainPoint {
     blockHeader?: IBlockHeaderHash
 }
 
-export function  isIChainPoint( stuff: any ): stuff is IChainPoint
+export function isIChainPoint( stuff: any ): stuff is IChainPoint
 {
     return (
         isObject( stuff ) &&
@@ -32,15 +32,17 @@ export function  isIChainPoint( stuff: any ): stuff is IChainPoint
     );
 }
 
+export function isOriginPoint( point: IChainPoint ): boolean
+{
+    return typeof point.blockHeader === "undefined" || !isIBlockHeaderHash( point.blockHeader );
+}
+
 export class ChainPoint
     implements ToCbor, ToCborObj, IChainPoint
 {
     readonly blockHeader?: IBlockHeaderHash;
 
-    isOrigin(): boolean
-    {
-        return typeof this.blockHeader === "undefined" || !isIBlockHeaderHash( this.blockHeader );
-    }
+    isOrigin(): boolean { return isOriginPoint( this ) }
 
     constructor( chainPoint: IChainPoint )
     {

@@ -1,4 +1,5 @@
-import { CanBeCborString, Cbor, CborArray, CborBytes, CborObj, CborString, CborTag, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
+import { CanBeCborString, Cbor, CborArray, CborBytes, CborObj, CborString, CborTag, CborUInt, LazyCborArray, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
+import { LazyCborTag } from "@harmoniclabs/cbor/dist/LazyCborObj/LazyCborTag";
 import { hasOwn, isObject } from "@harmoniclabs/obj-utils";
 
 export interface IBlockFetchBlock {
@@ -20,6 +21,7 @@ export function isIBlockFetchBlock( stuff: any ): stuff is IBlockFetchBlock
 export class BlockFetchBlock
     implements ToCbor, ToCborObj, IBlockFetchBlock
 {
+    readonly cborBytes?: Uint8Array
     readonly blockCbor: CborString;
 
     constructor( iblock: IBlockFetchBlock)
@@ -40,7 +42,7 @@ export class BlockFetchBlock
 
     toCbor(): CborString
     {
-        return Cbor.encode( this.toCborObj() );
+        return new CborString( this.toCborBytes() );
     }
     toCborObj()
     {
@@ -54,10 +56,50 @@ export class BlockFetchBlock
             )
         ]);
     }
+    toCborBytes(): Uint8Array
+    {
+        if(!( this.cborBytes instanceof Uint8Array ))
+        {
+            // @ts-ignore Cannot assign to 'cborBytes' because it is a read-only property.
+            this.cborBytes = Cbor.encode( this.toCborObj() ).toBuffer();
+        }
 
+        return Uint8Array.prototype.slice.call( this.cborBytes );
+    }
+
+    /**
+     * @returns {Uint8Array}
+     * the bytes of `this.blockCbor` as present on `this.cborBytes`
+     * (using `Cbor.parseLazy`)
+     */
+    getBlockBytes(): Uint8Array
+    {
+        const msgData = this.toCborBytes();
+        const lazy = Cbor.parseLazy( msgData );
+        if(!( lazy instanceof LazyCborArray )) throw new Error("invalid 'BlockFetchBlock' cbor found");
+        
+        const tagBytes = lazy.array[1];
+        const lazyTag = Cbor.parseLazy( tagBytes );
+        if(!( lazyTag instanceof LazyCborTag )) throw new Error("invalid 'BlockFetchBlock' cbor found");
+        
+        const taggedElem = lazyTag.data;
+        if(!( taggedElem instanceof CborBytes )) throw new Error("invalid 'BlockFetchBlock' cbor found");
+        
+        return taggedElem.buffer;
+    }
+    
     static fromCbor( cbor: CanBeCborString ): BlockFetchBlock
     {
-        return BlockFetchBlock.fromCborObj( Cbor.parse( forceCborString( cbor ) ) );
+        const buff = cbor instanceof Uint8Array ?
+            cbor: 
+            forceCborString( cbor ).toBuffer();
+
+        const msg = BlockFetchBlock.fromCborObj( Cbor.parse( buff ) );
+
+        // @ts-ignore Cannot assign to 'cborBytes' because it is a read-only property.ts(2540)
+        msg.cborBytes = buff;
+        
+        return msg;
     }
     static fromCborObj( cbor: CborObj ): BlockFetchBlock
     {

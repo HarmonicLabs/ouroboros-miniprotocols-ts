@@ -407,14 +407,10 @@ export class ChainSyncClient
                     // before dispatch event
                     Error.stackTraceLimit = originalSTLimit;
 
-                    const err = typeof e?.message === "string" ? 
-                        new Error(
-                            e.message +
-                            "\ndata: " + toHex( chunk ) + "\n"
-                        ):
-                        new Error(
-                            "\ndata: " + toHex( chunk ) + "\n"
-                        );
+                    const err = new Error(
+                        typeof e?.message === "string" ? e.message : "" +
+                        "\ndata: " + toHex( chunk ) + "\n"
+                    );
                     
                     dispatchEvent("error", err );
                 }
@@ -427,6 +423,7 @@ export class ChainSyncClient
                     // reference same memory (`subarray`)
                     // ignore the parsed bytes
                     chunk = chunk.subarray( offset );
+                    offset = -1;
                 }
             }
 
