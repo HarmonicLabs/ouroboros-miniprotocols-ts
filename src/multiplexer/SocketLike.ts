@@ -189,7 +189,7 @@ export function isNode2NodeSocket( socketLike: SocketLike ): boolean
 /**
  * any `SocketLike` but with a common interface
 **/
-export interface WrappedSocket<S extends SocketLike> {
+export interface WrappedSocket {
     send: ( data: Uint8Array ) => void
     /**
      * close the comunication
@@ -213,11 +213,11 @@ export interface WrappedSocket<S extends SocketLike> {
     /**
      * used to retry connecting the socket in the event is needed after it has been closed
     **/
-    reconnect: () => S;
+    reconnect: () => SocketLike;
     isClosed: () => boolean;
     isReady: () => boolean;
 
-    unwrap: () => S;
+    unwrap: <S extends SocketLike>() => S;
 }
 
 export type WrappedSocketEvt
@@ -245,15 +245,15 @@ function nodeSocketLikeIsReady( this: NodeSocketLike ): boolean
     return !this.connecting && !this.pending && !this.destroyed;
 }
 
-export function wrapSocket<S extends SocketLike>(
-    socketLike: S,
-    reconnect: ( this: S ) => S
-): WrappedSocket<S>
+export function wrapSocket(
+    socketLike: SocketLike,
+    reconnect: ( this: SocketLike ) => SocketLike
+): WrappedSocket
 {
     if( isWebSocketLike( socketLike ) )
     {
-        const socket: WrappedSocket<S> = {
-            unwrap: () => socketLike,
+        const socket: WrappedSocket = {
+            unwrap: () => socketLike as any,
             reconnect: reconnect.bind( socketLike ),
             isClosed: webSocketLikeIsClosed.bind( socketLike ),
             isReady: webSocketLikeIsReady.bind( socketLike ),
@@ -333,8 +333,8 @@ export function wrapSocket<S extends SocketLike>(
     }
     else if( isNodeSocketLike( socketLike ) )
     {
-        const socket: WrappedSocket<S> = {
-            unwrap: () => socketLike,
+        const socket: WrappedSocket = {
+            unwrap: () => socketLike as any,
             reconnect: reconnect.bind( socketLike ),
             isClosed: nodeSocketLikeIsClosed.bind( socketLike ),
             isReady: nodeSocketLikeIsReady.bind( socketLike ),

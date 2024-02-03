@@ -272,6 +272,9 @@ export class BlockFetchClient
 
             let msg: BlockFetchMessage;
 
+            const dbg_chunk = Uint8Array.prototype.slice.call( chunk );
+            const dbg_prev = prevBytes ? Uint8Array.prototype.slice.call( prevBytes ) : prevBytes;
+
             if( prevBytes )
             {
                 const tmp = new Uint8Array( prevBytes.length + chunk.length );
@@ -314,8 +317,12 @@ export class BlockFetchClient
                     // before dispatch event
                     Error.stackTraceLimit = originalSTLimit;
 
+                    console.error("-------------------------------------------------------");
+                    console.error( "dbg_chunk", toHex( dbg_chunk ) );
+                    console.error( "dbg_prev", dbg_prev ? toHex( dbg_prev ) : dbg_prev );
+                    console.error("-------------------------------------------------------");
                     const err = new Error(
-                        typeof e?.message === "string" ? e.message : "" +
+                        (typeof e?.message === "string" ? e.message : "") +
                         "\ndata: " + toHex( chunk ) + "\n"
                     );
                     

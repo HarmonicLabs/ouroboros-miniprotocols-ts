@@ -20,7 +20,7 @@ test.skip("ChainSync", async () => {
 
     const chainSyncClient = new ChainSyncClient( mplexer );
 
-    mplexer.onHandshake(( chunk, header ) => {
+    mplexer.on("Handshake",( chunk, header ) => {
         const msg = n2cHandshakeMessageFromCbor( chunk );
         console.log( msg );
     });
@@ -33,7 +33,7 @@ test.skip("ChainSync", async () => {
 
     // handshake
     await new Promise<void>(( resolve => {
-        mplexer.onHandshake( chunk => {
+        mplexer.on("Handshake", chunk => {
 
             const msg = n2cHandshakeMessageFromCbor( chunk );
 

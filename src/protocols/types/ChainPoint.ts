@@ -21,6 +21,14 @@ export interface IChainPoint {
     blockHeader?: IBlockHeaderHash
 }
 
+export interface IOriginPoint extends IChainPoint {
+    blockHeader: undefined
+}
+
+export interface IRealPoint extends IChainPoint {
+    blockHeader: IBlockHeaderHash
+}
+
 export function isIChainPoint( stuff: any ): stuff is IChainPoint
 {
     return (
@@ -32,9 +40,14 @@ export function isIChainPoint( stuff: any ): stuff is IChainPoint
     );
 }
 
-export function isOriginPoint( point: IChainPoint ): boolean
+export function isOriginPoint( point: IChainPoint ): point is IOriginPoint
 {
     return typeof point.blockHeader === "undefined" || !isIBlockHeaderHash( point.blockHeader );
+}
+
+export function isRealPoint( point: IChainPoint ): point is IRealPoint
+{
+    return isIBlockHeaderHash( point.blockHeader );
 }
 
 export class ChainPoint
@@ -69,7 +82,6 @@ export class ChainPoint
             }
         };
     }
-
     toString(): string
     {
         if( this.isOrigin() ) return "(point: origin)";

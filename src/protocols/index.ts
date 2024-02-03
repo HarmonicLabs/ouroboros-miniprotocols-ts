@@ -7,6 +7,4 @@ export * from "./local-tx-monitor";
 export * from "./local-tx-submit";
 export * from "./peer-sharing";
 export * from "./tx-submission";
-export * from "./types/ChainPoint";
-export * from "./types/ChainTip";
-export * from "./types/NetworkMagic";
+export * from "./types/";

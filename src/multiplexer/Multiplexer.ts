@@ -30,9 +30,9 @@ type MultiplexerEvtListeners = {
 
 export type MultiplexerProtocolType = "node-to-node" | "node-to-client";
 
-export interface MultiplexerConfig<S extends SocketLike> {
+export interface MultiplexerConfig {
     protocolType: MultiplexerProtocolType,
-    connect: () => S
+    connect: () => SocketLike
 }
 
 export type MultiplexerCloseOptions = {
@@ -63,9 +63,9 @@ export type ArgsOf<Evt extends MplexerEvtName> =
     Evt extends "error" ? [ err: Error ] :
     [ payload: Uint8Array, header: MultiplexerHeader ];
 
-export class Multiplexer<S extends SocketLike = SocketLike>
+export class Multiplexer
 {
-    readonly socket: WrappedSocket<S>
+    readonly socket: WrappedSocket
     readonly isN2N: boolean
 
     readonly clearListeners: ( protocol?: MiniProtocol ) => void
@@ -81,25 +81,12 @@ export class Multiplexer<S extends SocketLike = SocketLike>
     emit                : <Evt extends MplexerEvtName>( evt: Evt, ...args: ArgsOf<Evt> ) => boolean
     dispatchEvent       : <Evt extends MplexerEvtName>( evt: Evt, ...args: ArgsOf<Evt> ) => boolean
 
-    /** @deprecated */
-    onHandshake!: ( cb: MultiplexerEvtListener ) => void
-    /** @deprecated */
-    onChainSync!: ( cb: MultiplexerEvtListener ) => void
-    /** @deprecated */
-    onBlockFetch!: ( cb: MultiplexerEvtListener ) => void
-    /** @deprecated */
-    onTxSubmission!: ( cb: MultiplexerEvtListener ) => void
-    /** @deprecated */
-    onLocalStateQuery!: ( cb: MultiplexerEvtListener ) => void
-    /** @deprecated */
-    onKeepAlive!: ( cb: MultiplexerEvtListener ) => void
-
     send: ( payload: Uint8Array, header: MultiplexerHeaderInfos ) => void;
 
     close: ( options?: MultiplexerCloseOptions ) => void;
     isClosed: () => boolean
 
-    constructor( cfg: MultiplexerConfig<S> )
+    constructor( cfg: MultiplexerConfig )
     {
         const self = this
         const reconnect = cfg.connect;
@@ -324,45 +311,6 @@ export class Multiplexer<S extends SocketLike = SocketLike>
             }
         }
 
-        /** @deprecated */
-        function onHandshake( cb: MultiplexerEvtListener )
-        {
-            eventListeners[MiniProtocol.Handshake].push( cb );
-        }
-        /** @deprecated */
-        function onChainSync( cb: MultiplexerEvtListener )
-        {
-            eventListeners[
-                isN2N ?
-                MiniProtocol.ChainSync :
-                MiniProtocol.LocalChainSync
-            ].push( cb );
-        }
-        /** @deprecated */
-        function onBlockFetch( cb: MultiplexerEvtListener )
-        {
-            eventListeners[MiniProtocol.BlockFetch].push( cb );
-        }
-        /** @deprecated */
-        function onTxSubmission( cb: MultiplexerEvtListener )
-        {
-            eventListeners[
-                isN2N ?
-                MiniProtocol.TxSubmission :
-                MiniProtocol.LocalTxSubmission
-            ].push( cb );
-        }
-        /** @deprecated */
-        function onLocalStateQuery( cb: MultiplexerEvtListener )
-        {
-            eventListeners[MiniProtocol.LocalStateQuery].push( cb );
-        }
-        /** @deprecated */
-        function onKeepAlive( cb: MultiplexerEvtListener )
-        {
-            eventListeners[MiniProtocol.KeepAlive].push( cb );
-        }
-
         function addEventListenerOnce<Evt extends MplexerEvtName>( evt: Evt, listener: MplexerListenerOf<Evt> ): typeof self
         {
             if( !isMplexerEvtName( evt ) ) return self;
@@ -460,12 +408,6 @@ export class Multiplexer<S extends SocketLike = SocketLike>
                 send:                   { value: send, ...roDescr },
                 close:                  { value: close, ...roDescr },
                 isClosed:               { value: isClosed, ...roDescr },
-                onHandshake:            { value: onHandshake, ...roDescr },
-                onChainSync:            { value: onChainSync, ...roDescr },
-                onBlockFetch:           { value: onBlockFetch, ...roDescr },
-                onTxSubmission:         { value: onTxSubmission, ...roDescr },
-                onLocalStateQuery:      { value: onLocalStateQuery, ...roDescr },
-                onKeepAlive:            { value: onKeepAlive, ...roDescr },
                 clearListeners:         { value: clearListeners, ...roDescr },
                 addEventListener:       { value: addEventListener, ...roDescr },
                 addListener:            { value: addEventListener, ...roDescr },
