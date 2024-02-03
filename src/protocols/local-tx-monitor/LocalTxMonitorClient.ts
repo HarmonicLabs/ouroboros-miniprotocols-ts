@@ -262,7 +262,6 @@ export class TxMonitorClient
                 
                 offset = thing.offset;
 
-                // console.log( "msg byetes", offset, toHex( chunk.subarray( 0, offset ) ) );
                 msg = txMonitorMessageFromCborObj( thing.parsed )
                 queque.unshift( msg );
                 if( offset < chunk.length )

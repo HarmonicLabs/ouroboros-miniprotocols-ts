@@ -43,7 +43,6 @@ test.skip("ChainSync", async () => {
                 resolve();
             }
             else {
-                console.log( msg );
                 throw new Error("TODO: handle rejection")
             }
         });

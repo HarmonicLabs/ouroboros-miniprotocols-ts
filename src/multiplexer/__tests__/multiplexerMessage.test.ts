@@ -72,19 +72,5 @@ describe("multiplexerMessage", () => {
             )
         );
         await new Promise( r => setTimeout( r, 500 ));
-        
-        // console.log( msgs.length, msgs );
-        // console.log( mplexerMsgs.length, mplexerMsgs );
-        // console.log( socketData.length, socketData.map( toHex ).join("\n\n") );
-        // console.log();
-        // console.log( toHex( socketData[0] ) + toHex( socketData[1].slice( 0, 166 ) ) );
-        // console.log( toHex( socketData[1].slice( 166 ) ) );
-// 
-        console.log( unwrapMultiplexerMessages( socketData[1].slice( 166 ) ) );
-        // console.log( toHex( socketData[1].slice( 166, 166 + 8 ) ) );
-        // await new Promise<void>( resolve => {
-// 
-        //     client.on("batchDone", () => resolve());
-        // });
     })
 });

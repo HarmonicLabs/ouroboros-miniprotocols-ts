@@ -200,15 +200,6 @@ export class LocalTxSubmitClient
 
             if( prevBytes )
             {
-                /*
-                console.log( "prevBytes.length", prevBytes.length );
-                console.log( "chunk.length", chunk.length );
-                console.log( "prevBytes.length + chunk.length", prevBytes.length + chunk.length );
-
-                console.log( "prevBytes", toHex( prevBytes ) );
-                console.log( "chunk", toHex( chunk ) );
-                // */
-
                 const tmp = new Uint8Array( prevBytes.length + chunk.length );
                 tmp.set( prevBytes, 0 );
                 tmp.set( chunk, prevBytes.length );
@@ -230,7 +221,6 @@ export class LocalTxSubmitClient
                 
                 offset = thing.offset;
 
-                // console.log( "msg byetes", offset, toHex( chunk.subarray( 0, offset ) ) );
                 msg = localTxSubmitMessageFromCborObj( thing.parsed )
                 queque.unshift( msg );
 

@@ -237,7 +237,6 @@ export class LocalStateQueryClient
 
         function dispatchEvent( eventName: LocalStateQueryEvtName, msg: QryMessage | Error ): boolean
         {
-            // console.log( eventName, msg );
             if( !isLocalStateQueryEvtName( eventName ) ) return true;
             if( eventName !== "error" && !isQryMessage( msg ) ) return true;
 
@@ -312,7 +311,6 @@ export class LocalStateQueryClient
                 
                 offset = thing.offset;
 
-                // console.log( "msg byetes", offset, toHex( chunk.subarray( 0, offset ) ) );
                 // Error.stackTraceLimit = originalSTLimit;
                 try {
                     msg = localStateQueryMessageFromCborObj( thing.parsed );
