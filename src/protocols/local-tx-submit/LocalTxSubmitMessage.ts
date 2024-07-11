@@ -1,9 +1,9 @@
 import { isObject } from "@harmoniclabs/obj-utils";
-import { LocalTxSubmitAccept } from "./LocalTxSubmitAccept";
-import { LocalTxSubmitDone } from "./LocalTxSubmitDone";
-import { LocalTxSubmitReject } from "./LocalTxSubmitReject";
-import { LocalTxSubmitSubmit } from "./LocalTxSubmitSubmit";
+import { LocalTxSubmitAccept } from "./messages/LocalTxSubmitAccept";
+import { LocalTxSubmitDone } from "./messages/LocalTxSubmitDone";
+import { LocalTxSubmitSubmit } from "./messages/LocalTxSubmitSubmit";
 import { CanBeCborString, Cbor, CborArray, CborObj, CborUInt, forceCborString } from "@harmoniclabs/cbor";
+import { LocalTxSubmitReject } from "./messages/LocalTxSubmitReject";
 
 export type LocalTxSubmitMessage
     = LocalTxSubmitSubmit

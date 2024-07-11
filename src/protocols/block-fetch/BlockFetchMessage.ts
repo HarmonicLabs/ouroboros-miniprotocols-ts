@@ -1,10 +1,10 @@
 import { isObject } from "@harmoniclabs/obj-utils";
-import { BlockFetchBatchDone, IBlockFetchBatchDone } from "./BlockFetchBatchDone";
-import { BlockFetchBlock, IBlockFetchBlock } from "./BlockFetchBlock";
-import { BlockFetchClientDone, IBlockFetchClientDone } from "./BlockFetchClientDone";
-import { BlockFetchNoBlocks, IBlockFetchNoBlocks } from "./BlockFetchNoBlocks";
-import { BlockFetchRequestRange, IBlockFetchRequestRange } from "./BlockFetchRequestRange";
-import { BlockFetchStartBatch, IBlockFetchStartBatch } from "./BlockFetchStartBatch";
+import { BlockFetchBatchDone, IBlockFetchBatchDone } from "./messages/BlockFetchBatchDone";
+import { BlockFetchBlock, IBlockFetchBlock } from "./messages/BlockFetchBlock";
+import { BlockFetchClientDone, IBlockFetchClientDone } from "./messages/BlockFetchClientDone";
+import { BlockFetchNoBlocks, IBlockFetchNoBlocks } from "./messages/BlockFetchNoBlocks";
+import { BlockFetchRequestRange, IBlockFetchRequestRange } from "./messages/BlockFetchRequestRange";
+import { BlockFetchStartBatch, IBlockFetchStartBatch } from "./messages/BlockFetchStartBatch";
 import { CanBeCborString, Cbor, CborArray, CborObj, CborUInt, forceCborString } from "@harmoniclabs/cbor";
 
 export type BlockFetchMessage

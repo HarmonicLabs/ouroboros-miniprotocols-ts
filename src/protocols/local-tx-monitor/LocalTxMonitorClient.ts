@@ -1,20 +1,17 @@
 import { Cbor, CborObj } from "@harmoniclabs/cbor";
 import { MiniProtocol } from "../../MiniProtocol";
 import { Multiplexer } from "../../multiplexer";
-import { IChainPoint } from "../types/ChainPoint";
 import { TxMonitorMessage, txMonitorMessageFromCborObj } from "./TxMonitorMessage";
-import { TxMonitorAcquire } from "./TxMonitorAcquire";
-import { TxMonitorAcquired } from "./TxMonitorAcquired";
-import { TxMonitorDone } from "./TxMonitorDone";
-import { TxMonitorGetSizes } from "./TxMonitorGetSizes";
-import { TxMonitorHasTx } from "./TxMonitorHasTx";
-import { TxMonitorNextTx } from "./TxMonitorNextTx";
-import { TxMonitorRelease } from "./TxMonitorRelease";
-import { TxMonitorReplyGetSizes } from "./TxMonitorReplyGetSizes";
-import { TxMonitorReplyHasTx } from "./TxMonitorReplyHasTx";
-import { TxMonitorReplyNextTx } from "./TxMonitorReplyNextTx";
+import { TxMonitorAcquire } from "./messages/TxMonitorAcquire";
+import { TxMonitorDone } from "./messages/TxMonitorDone";
+import { TxMonitorGetSizes } from "./messages/TxMonitorGetSizes";
+import { TxMonitorNextTx } from "./messages/TxMonitorNextTx";
+import { TxMonitorRelease } from "./messages/TxMonitorRelease";
+import { TxMonitorReplyGetSizes } from "./messages/TxMonitorReplyGetSizes";
+import { TxMonitorReplyHasTx } from "./messages/TxMonitorReplyHasTx";
 import { AddEvtListenerOpts } from "../../common/AddEvtListenerOpts";
 import { fromHex } from "@harmoniclabs/uint8array-utils";
+import { TxMonitorAcquired, TxMonitorReplyNextTx, TxMonitorHasTx } from "./messages";
 
 const roDescr = {
     writable: false,
@@ -306,7 +303,7 @@ export class TxMonitorClient
                 new TxMonitorAcquire().toCbor().toBuffer(),
                 agencyHeader
             );
-        })
+        });
     }
 
     done(): void

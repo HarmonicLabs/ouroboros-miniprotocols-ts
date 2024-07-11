@@ -2,13 +2,13 @@ import { Cbor, CborObj } from "@harmoniclabs/cbor";
 import { MiniProtocol } from "../../MiniProtocol";
 import { Multiplexer } from "../../multiplexer";
 import { ChainPoint, IChainPoint, isOriginPoint } from "../types/ChainPoint";
-import { BlockFetchBatchDone } from "./BlockFetchBatchDone";
-import { BlockFetchClientDone } from "./BlockFetchClientDone";
+import { BlockFetchBatchDone } from "./messages/BlockFetchBatchDone";
+import { BlockFetchClientDone } from "./messages/BlockFetchClientDone";
 import { BlockFetchMessage, blockFetchMessageFromCborObj, isBlockFetchMessage } from "./BlockFetchMessage";
-import { BlockFetchNoBlocks } from "./BlockFetchNoBlocks";
-import { BlockFetchRequestRange } from "./BlockFetchRequestRange";
-import { BlockFetchStartBatch } from "./BlockFetchStartBatch";
-import { BlockFetchBlock } from "./BlockFetchBlock";
+import { BlockFetchNoBlocks } from "./messages/BlockFetchNoBlocks";
+import { BlockFetchRequestRange } from "./messages/BlockFetchRequestRange";
+import { BlockFetchStartBatch } from "./messages/BlockFetchStartBatch";
+import { BlockFetchBlock } from "./messages/BlockFetchBlock";
 import { AddEvtListenerOpts } from "../../common/AddEvtListenerOpts";
 import { toHex } from "@harmoniclabs/uint8array-utils";
 
@@ -272,8 +272,8 @@ export class BlockFetchClient
 
             let msg: BlockFetchMessage;
 
-            const dbg_chunk = Uint8Array.prototype.slice.call( chunk );
-            const dbg_prev = prevBytes ? Uint8Array.prototype.slice.call( prevBytes ) : prevBytes;
+            // const dbg_chunk = Uint8Array.prototype.slice.call( chunk );
+            // const dbg_prev = prevBytes ? Uint8Array.prototype.slice.call( prevBytes ) : prevBytes;
 
             if( prevBytes )
             {
@@ -317,10 +317,10 @@ export class BlockFetchClient
                     // before dispatch event
                     Error.stackTraceLimit = originalSTLimit;
 
-                    console.error("-------------------------------------------------------");
-                    console.error( "dbg_chunk", toHex( dbg_chunk ) );
-                    console.error( "dbg_prev", dbg_prev ? toHex( dbg_prev ) : dbg_prev );
-                    console.error("-------------------------------------------------------");
+                    // console.error("-------------------------------------------------------");
+                    // console.error( "dbg_chunk", toHex( dbg_chunk ) );
+                    // console.error( "dbg_prev", dbg_prev ? toHex( dbg_prev ) : dbg_prev );
+                    // console.error("-------------------------------------------------------");
                     const err = new Error(
                         (typeof e?.message === "string" ? e.message : "") +
                         "\ndata: " + toHex( chunk ) + "\n"
@@ -367,6 +367,7 @@ export class BlockFetchClient
     /** @deprecated */
     onClientDone!:      ( cb: ( msg: BlockFetchClientDone   ) => void ) => void
 
+    /** request a single block from peer */
     request( point: IChainPoint ): Promise<BlockFetchNoBlocks | BlockFetchBlock>
     {
         return this.requestRange(point, point)

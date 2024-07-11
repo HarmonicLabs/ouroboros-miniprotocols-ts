@@ -1,6 +1,6 @@
 import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
 import { isObject } from "@harmoniclabs/obj-utils";
-import { canBeUInteger, forceBigUInt, forceUInteger } from "../types/ints";
+import { canBeUInteger, forceBigUInt, forceUInteger } from "../../types/ints";
 
 export interface ITxSubmitRequestIds {
     blocking: boolean,

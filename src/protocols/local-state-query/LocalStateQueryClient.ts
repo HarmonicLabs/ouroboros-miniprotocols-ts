@@ -3,17 +3,16 @@ import { MiniProtocol } from "../../MiniProtocol";
 import { AddEvtListenerOpts } from "../../common/AddEvtListenerOpts";
 import { ErrorListener } from "../../common/ErrorListener";
 import { Multiplexer } from "../../multiplexer";
-import { QryAcquire } from "./QryAcquire";
-import { QryAcquired } from "./QryAcquired";
-import { QryDone } from "./QryDone";
-import { QryFailure } from "./QryFailure";
+import { QryAcquired } from "./messages/QryAcquired";
+import { QryDone } from "./messages/QryDone";
+import { QryFailure } from "./messages/QryFailure";
 import { QryMessage, isQryMessage, localStateQueryMessageFromCborObj } from "./QryMessage";
-import { QryQuery } from "./QryQuery";
-import { QryReAcquire } from "./QryReAcquire";
-import { QryRelease } from "./QryRelease";
-import { QryResult } from "./QryResult";
+import { QryQuery } from "./messages/QryQuery";
+import { QryRelease } from "./messages/QryRelease";
+import { QryResult } from "./messages/QryResult";
 import { toHex } from "@harmoniclabs/uint8array-utils";
 import { IChainPoint } from "../types/ChainPoint";
+import { QryAcquire, QryReAcquire } from "./messages";
 
 
 const roDescr = Object.freeze({

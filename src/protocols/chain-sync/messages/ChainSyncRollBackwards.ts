@@ -1,7 +1,7 @@
 import { CanBeCborString, Cbor, CborArray, CborBytes, CborObj, CborString, CborTag, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
-import { ChainPoint, IChainPoint, isIChainPoint } from "../types/ChainPoint";
-import { ChainTip, IChainTip, isIChainTip } from "../types/ChainTip";
-import { getCborBytesDescriptor } from "./utils/getCborBytesDescriptor";
+import { ChainPoint, IChainPoint, isIChainPoint } from "../../types/ChainPoint";
+import { ChainTip, IChainTip, isIChainTip } from "../../types/ChainTip";
+import { getCborBytesDescriptor } from "../../utils/getCborBytesDescriptor";
 
 export interface IChainSyncRollBackwards {
     point: IChainPoint,

@@ -1,13 +1,6 @@
 import { isObject } from "@harmoniclabs/obj-utils";
-import { ChainSyncAwaitReply, IChainSyncAwaitReply } from "./ChainSyncAwaitReply";
-import { ChainSyncFindIntersect, IChainSyncFindIntersect } from "./ChainSyncFindIntersect";
-import { ChainSyncIntersectFound, IChainSyncIntersectFound } from "./ChainSyncIntersectFound";
-import { ChainSyncIntersectNotFound, IChainSyncIntersectNotFound } from "./ChainSyncIntersectNotFound";
-import { ChainSyncMessageDone, IChainSyncMessageDone } from "./ChainSyncMessageDone";
-import { ChainSyncRequestNext, IChainSyncRequestNext } from "./ChainSyncRequestNext";
-import { ChainSyncRollBackwards, IChainSyncRollBackwards } from "./ChainSyncRollBackwards";
-import { ChainSyncRollForward, IChainSyncRollForward } from "./ChainSyncRollForward";
 import { CanBeCborString, Cbor, CborArray, CborObj, CborUInt, forceCborString } from "@harmoniclabs/cbor";
+import { ChainSyncRequestNext, ChainSyncAwaitReply, ChainSyncRollForward, ChainSyncRollBackwards, ChainSyncFindIntersect, ChainSyncIntersectFound, ChainSyncIntersectNotFound, ChainSyncMessageDone, IChainSyncRequestNext, IChainSyncAwaitReply, IChainSyncRollForward, IChainSyncRollBackwards, IChainSyncFindIntersect, IChainSyncIntersectFound, IChainSyncIntersectNotFound, IChainSyncMessageDone } from "./messages";
 
 export type ChainSyncMessage
     = ChainSyncRequestNext

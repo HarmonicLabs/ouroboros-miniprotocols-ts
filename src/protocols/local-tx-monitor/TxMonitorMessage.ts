@@ -1,15 +1,13 @@
 import { isObject } from "@harmoniclabs/obj-utils";
-import { TxMonitorAcquire, TxMonitorAwaitAquire } from "./TxMonitorAcquire";
-import { TxMonitorAcquired } from "./TxMonitorAcquired";
-import { TxMonitorDone } from "./TxMonitorDone";
-import { TxMonitorGetSizes } from "./TxMonitorGetSizes";
-import { TxMonitorHasTx } from "./TxMonitorHasTx";
-import { TxMonitorNextTx } from "./TxMonitorNextTx";
-import { TxMonitorRelease } from "./TxMonitorRelease";
-import { TxMonitorReplyGetSizes } from "./TxMonitorReplyGetSizes";
-import { TxMonitorReplyHasTx } from "./TxMonitorReplyHasTx";
-import { TxMonitorReplyNextTx } from "./TxMonitorReplyNextTx";
+import { TxMonitorAcquire, TxMonitorAwaitAquire } from "./messages/TxMonitorAcquire";
+import { TxMonitorDone } from "./messages/TxMonitorDone";
+import { TxMonitorGetSizes } from "./messages/TxMonitorGetSizes";
+import { TxMonitorNextTx } from "./messages/TxMonitorNextTx";
+import { TxMonitorRelease } from "./messages/TxMonitorRelease";
+import { TxMonitorReplyGetSizes } from "./messages/TxMonitorReplyGetSizes";
+import { TxMonitorReplyHasTx } from "./messages/TxMonitorReplyHasTx";
 import { CanBeCborString, Cbor, CborArray, CborObj, CborUInt, cborObjFromRaw, forceCborString } from "@harmoniclabs/cbor";
+import { TxMonitorAcquired, TxMonitorReplyNextTx, TxMonitorHasTx } from "./messages";
 
 export type TxMonitorMessage
     = TxMonitorDone

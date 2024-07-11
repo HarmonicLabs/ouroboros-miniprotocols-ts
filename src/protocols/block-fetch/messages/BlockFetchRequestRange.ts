@@ -1,5 +1,5 @@
 import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
-import { ChainPoint, IChainPoint, isIChainPoint } from "../types/ChainPoint";
+import { ChainPoint, IChainPoint, isIChainPoint } from "../../types/ChainPoint";
 
 export interface IBlockFetchRequestRange {
     from: IChainPoint,

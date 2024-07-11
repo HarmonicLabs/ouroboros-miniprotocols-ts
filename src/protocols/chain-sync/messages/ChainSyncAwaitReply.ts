@@ -1,6 +1,6 @@
 import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
 import { isObject } from "@harmoniclabs/obj-utils";
-import { getCborBytesDescriptor } from "./utils/getCborBytesDescriptor";
+import { getCborBytesDescriptor } from "../../utils/getCborBytesDescriptor";
 
 export interface IChainSyncAwaitReply {};
 

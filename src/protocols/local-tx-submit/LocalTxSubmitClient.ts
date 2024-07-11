@@ -3,11 +3,11 @@ import { MiniProtocol } from "../../MiniProtocol";
 import { Multiplexer } from "../../multiplexer/Multiplexer";
 import { IChainPoint } from "../types/ChainPoint";
 import { LocalTxSubmitMessage, localTxSubmitMessageFromCborObj } from "./LocalTxSubmitMessage";
-import { LocalTxSubmitAccept } from "./LocalTxSubmitAccept";
-import { LocalTxSubmitReject } from "./LocalTxSubmitReject";
-import { LocalTxSubmitSubmit } from "./LocalTxSubmitSubmit";
-import { LocalTxSubmitDone } from "./LocalTxSubmitDone";
+import { LocalTxSubmitAccept } from "./messages/LocalTxSubmitAccept";
+import { LocalTxSubmitSubmit } from "./messages/LocalTxSubmitSubmit";
+import { LocalTxSubmitDone } from "./messages/LocalTxSubmitDone";
 import { AddEvtListenerOpts } from "../../common/AddEvtListenerOpts";
+import { LocalTxSubmitReject } from "./messages/LocalTxSubmitReject";
 
 const roDescr = {
     writable: false,

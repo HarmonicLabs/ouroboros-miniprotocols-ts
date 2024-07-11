@@ -1,13 +1,13 @@
 import { isObject } from "@harmoniclabs/obj-utils";
-import { QryAcquire } from "./QryAcquire";
-import { QryAcquired } from "./QryAcquired";
-import { QryDone } from "./QryDone";
-import { QryFailure } from "./QryFailure";
-import { QryQuery } from "./QryQuery";
-import { QryReAcquire } from "./QryReAcquire";
-import { QryRelease } from "./QryRelease";
-import { QryResult } from "./QryResult";
 import { CborArray, CborObj, CborUInt } from "@harmoniclabs/cbor";
+import { QryAcquire } from "./messages/QryAcquire";
+import { QryAcquired } from "./messages/QryAcquired";
+import { QryDone } from "./messages/QryDone";
+import { QryFailure } from "./messages/QryFailure";
+import { QryQuery } from "./messages/QryQuery";
+import { QryReAcquire } from "./messages/QryReAcquire";
+import { QryRelease } from "./messages/QryRelease";
+import { QryResult } from "./messages/QryResult";
 
 export type QryMessage
     = QryAcquire

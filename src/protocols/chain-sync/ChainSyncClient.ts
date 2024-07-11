@@ -2,19 +2,11 @@ import { Cbor, CborObj } from "@harmoniclabs/cbor";
 import { MiniProtocol } from "../../MiniProtocol";
 import { Multiplexer } from "../../multiplexer/Multiplexer";
 import { IChainPoint } from "../types/ChainPoint";
-import { ChainSyncFindIntersect } from "./ChainSyncFindIntersect";
 import { ChainSyncMessage, chainSyncMessageFromCborObj, isChainSyncMessage } from "./ChainSyncMessage";
-import { ChainSyncRequestNext } from "./ChainSyncRequestNext";
-import { ChainSyncRollBackwards } from "./ChainSyncRollBackwards";
-import { ChainSyncRollForward } from "./ChainSyncRollForward";
-import { ChainSyncIntersectFound } from "./ChainSyncIntersectFound";
-import { ChainSyncIntersectNotFound } from "./ChainSyncIntersectNotFound";
-import { ChainSyncAwaitReply } from "./ChainSyncAwaitReply";
 import { toHex } from "@harmoniclabs/uint8array-utils";
-import { ChainSyncMessageDone } from "./ChainSyncMessageDone";
-import EventEmitter from "events";
-import { AddEvtListenerOpts } from "../../common/AddEvtListenerOpts";
+ import { AddEvtListenerOpts } from "../../common/AddEvtListenerOpts";
 import { ErrorListener } from "../../common/ErrorListener";
+import { ChainSyncRollBackwards, ChainSyncRollForward, ChainSyncIntersectFound, ChainSyncIntersectNotFound, ChainSyncAwaitReply, ChainSyncRequestNext, ChainSyncFindIntersect, ChainSyncMessageDone } from "./messages";
 
 const roDescr = Object.freeze({
     writable: false,
