@@ -1,5 +1,4 @@
-import { CanBeCborString, Cbor, CborArray, CborBytes, CborObj, CborString, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
-import { isObject } from "@harmoniclabs/obj-utils";
+import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
 import { getCborBytesDescriptor } from "../../utils/getCborBytesDescriptor";
 import { isWord16 } from "../../utils/isWord16";
 import { isWord32 } from "../../utils/isWord32";
