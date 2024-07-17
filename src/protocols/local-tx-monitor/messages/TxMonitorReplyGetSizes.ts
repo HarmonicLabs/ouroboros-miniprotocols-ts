@@ -1,4 +1,4 @@
-import { CanBeCborString, Cbor, CborArray, CborObj, CborUInt, forceCborString } from "@harmoniclabs/cbor";
+import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborUInt, forceCborString, ToCbor } from "@harmoniclabs/cbor";
 import { isObject } from "@harmoniclabs/obj-utils"
 
 const roDescr = Object.freeze({
@@ -24,7 +24,7 @@ export function isITxMonitorReplyGetSizes( stuff: any ): stuff is ITxMonitorRepl
 }
 
 export class TxMonitorReplyGetSizes
-    implements ITxMonitorReplyGetSizes
+    implements ITxMonitorReplyGetSizes, ToCbor
 {
     readonly mempoolCapacity: number
     readonly mempoolSize: number
@@ -52,7 +52,11 @@ export class TxMonitorReplyGetSizes
         );
     }
 
-    toCbor()
+    toCbor(): CborString
+    {
+        return Cbor.encode( this.toCborObj() );
+    }
+    toCborObj()
     {
         return new CborArray([
             new CborUInt( 10 ),
@@ -66,7 +70,7 @@ export class TxMonitorReplyGetSizes
 
     static fromCbor( cbor: CanBeCborString ): TxMonitorReplyGetSizes
     {
-        return TxMonitorReplyGetSizes.fromCborObj( Cbor.parse( forceCborString( cbor ) ))
+        return TxMonitorReplyGetSizes.fromCborObj( Cbor.parse( forceCborString( cbor ) ) );
     }
     static fromCborObj( cbor: CborObj ): TxMonitorReplyGetSizes
     {

@@ -1,7 +1,7 @@
 
 export function canBeInteger( stuff: any ): stuff is (number | bigint)
 {
-    return ( typeof stuff == "number" || typeof stuff === "bigint" );
+    return ( typeof stuff === "number" || typeof stuff === "bigint" );
 }
 
 export function forceInteger( stuff: number | bigint ): number

@@ -28,7 +28,7 @@ export function isIKeepAliveMessage( stuff: any ): stuff is IKeepAliveMessage
     return isObject( stuff ); // empty object satisfies some of the KeepAlive messages
 }
 
-export function chainSyncMessageFromCbor( cbor: CanBeCborString ): KeepAliveMessage
+export function keepAliveMessageFromCbor( cbor: CanBeCborString ): KeepAliveMessage
 {
     const buff = cbor instanceof Uint8Array ? 
         cbor : 

@@ -1,6 +1,6 @@
 import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
 import { isObject } from "@harmoniclabs/obj-utils";
-import { ChainPoint, IChainPoint, isIChainPoint } from "../types/ChainPoint";
+import { ChainPoint, IChainPoint, isIChainPoint } from "../../types/ChainPoint";
 
 export interface IQryReAcquire {
     point?: IChainPoint

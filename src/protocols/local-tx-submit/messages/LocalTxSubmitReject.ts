@@ -1,6 +1,6 @@
 import { CanBeCborString, Cbor, CborArray, CborNegInt, CborObj, CborString, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
 import { isObject } from "@harmoniclabs/obj-utils";
-import { canBeInteger } from "../types/ints";
+import { canBeInteger } from "../../types/ints";
 
 export interface ILocalTxSubmitReject {
     reason: number | bigint
