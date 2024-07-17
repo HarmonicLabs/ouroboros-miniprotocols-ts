@@ -72,7 +72,7 @@ export class PeerSharingResponse implements ToCbor, ToCborObj, IPeerSharingRespo
         )) throw new Error("invalid CBOR for `PeerSharingResponse`");
 
         return new PeerSharingResponse({
-            peerAddresses: cbor.array[1].array.map( ( cborAddress ) => cborObjToAddress( cborAddress ) )
+            peerAddresses: cbor.array[1].array.map( cborObjToAddress )
         });
     }
         
