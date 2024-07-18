@@ -26,12 +26,12 @@ export function isIPeerSharingMessage( stuff: any ): stuff is IPeerSharingMessag
     return isObject( stuff );
 }
 
-export function keepAliveMessageFromCbor( cbor: CanBeCborString ): PeerSharingMessage {
+export function peerSharingMessageFromCbor( cbor: CanBeCborString ): PeerSharingMessage {
     const buff = cbor instanceof Uint8Array ? 
         cbor : 
         forceCborString( cbor ).toBuffer();
     
-    const msg = keepAliveMessageFromCborObj( Cbor.parse( buff ) );
+    const msg = peerSharingMessageFromCborObj( Cbor.parse( buff ) );
 
     // @ts-ignore Cannot assign to 'cborBytes' because it is a read-only property.ts(2540)
     msg.cborBytes = buff;
@@ -39,7 +39,7 @@ export function keepAliveMessageFromCbor( cbor: CanBeCborString ): PeerSharingMe
     return msg;
 }
 
-export function keepAliveMessageFromCborObj( cbor: CborObj ): PeerSharingMessage {
+export function peerSharingMessageFromCborObj( cbor: CborObj ): PeerSharingMessage {
     if(!(
         cbor instanceof CborArray &&
         cbor.array.length >= 1 &&
