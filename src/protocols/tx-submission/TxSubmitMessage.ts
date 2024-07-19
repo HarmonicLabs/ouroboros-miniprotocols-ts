@@ -52,7 +52,7 @@ export function txSubmitMessageFromCborObj( cbor: CborObj ): TxSubmitMessage {
         cbor instanceof CborArray &&
         cbor.array.length >= 1 &&
         cbor.array[0] instanceof CborUInt
-    )) throw new Error("invalid cbor for 'LocalTxSubmitMessage'");
+    )) throw new Error("invalid CBOR for `TxSubmitMessage`");
 
     const idx = Number( cbor.array[0].num );
 
@@ -63,5 +63,5 @@ export function txSubmitMessageFromCborObj( cbor: CborObj ): TxSubmitMessage {
     if( idx === 3 ) return TxSubmitReplyTx.fromCborObj( cbor );
     if( idx === 4 ) return TxSubmitDone.fromCborObj( cbor );
 
-    throw new Error("invalid cbor for 'LocalTxSubmitMessage'; unknown index: " + idx);
+    throw new Error("invalid CBOR for `TxSubmitMessage`; unknown index: " + idx);
 }
