@@ -4,7 +4,7 @@ import { getCborBytesDescriptor } from "../../utils/getCborBytesDescriptor";
 
 export interface IPeerSharingDone {}
 
-export function isIKeepAliveDone( stuff: any ): stuff is IPeerSharingDone {
+export function isIPeerSharingDone( stuff: any ): stuff is IPeerSharingDone {
     return isObject( stuff );
 }
 
@@ -51,7 +51,7 @@ export class PeerSharingDone implements ToCbor, ToCborObj, IPeerSharingDone {
             cbor instanceof CborArray &&
             cbor.array[0] instanceof CborUInt &&
             cbor.array[0].num === BigInt(2)
-        )) throw new Error("invalid CBOR for 'KeepAliveDone");
+        )) throw new Error("invalid CBOR for 'PeerSharingDone");
 
         return new PeerSharingDone();
     }

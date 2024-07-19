@@ -11,7 +11,8 @@ export enum MiniProtocol {
     LocalTxSubmission = 6,
     LocalStateQuery = 7,
     KeepAlive = 8,
-    LocalTxMonitor = 9
+    LocalTxMonitor = 9,
+    PeerSharing = 10
 }
 
 Object.freeze( MiniProtocol );
@@ -25,7 +26,8 @@ export type MiniProtocolStr
     | "LocalTxSubmission"
     | "LocalStateQuery"
     | "KeepAlive"
-    | "LocalTxMonitor";
+    | "LocalTxMonitor"
+    | "PeerSharing";
 
 export function isMiniProtocolStr( thing: any ): thing is MiniProtocolStr
 {
@@ -38,33 +40,36 @@ export function isMiniProtocolStr( thing: any ): thing is MiniProtocolStr
         thing === "LocalTxSubmission"   ||
         thing === "LocalStateQuery"     ||
         thing === "KeepAlive"           ||
-        thing === "LocalTxMonitor"
+        thing === "LocalTxMonitor"      ||
+        thing === "PeerSharing"
     );
 }
 
 export type MiniProtocolNum
-    = 0 // "Handshake"
-    | 2 // "ChainSync"
-    | 5 // "LocalChainSync"
-    | 3 // "BlockFetch"
-    | 4 // "TxSubmission"
-    | 6 // "LocalTxSubmission"
-    | 7 // "LocalStateQuery"
-    | 8 // "KeepAlive"
-    | 9 // "LocalTxMonitor";
+    = 0     // "Handshake"
+    | 2     // "ChainSync"
+    | 5     // "LocalChainSync"
+    | 3     // "BlockFetch"
+    | 4     // "TxSubmission"
+    | 6     // "LocalTxSubmission"
+    | 7     // "LocalStateQuery"
+    | 8     // "KeepAlive"
+    | 9     // "LocalTxMonitor"
+    | 10    // "PeerSharing";
 
 export function isMiniProtocolNum( thing: any ): thing is MiniProtocolNum
 {
     return (
-        thing === 0 || // "Handshake"
-        thing === 2 || // "ChainSync"
-        thing === 5 || // "LocalChainSync"
-        thing === 3 || // "BlockFetch"
-        thing === 4 || // "TxSubmission"
-        thing === 6 || // "LocalTxSubmission"
-        thing === 7 || // "LocalStateQuery"
-        thing === 8 || // "KeepAlive";
-        thing === 9    // "LocalTxMonitor";
+        thing === 0     ||  // "Handshake"
+        thing === 2     ||  // "ChainSync"
+        thing === 5     ||  // "LocalChainSync"
+        thing === 3     ||  // "BlockFetch"
+        thing === 4     ||  // "TxSubmission"
+        thing === 6     ||  // "LocalTxSubmission"
+        thing === 7     ||  // "LocalStateQuery"
+        thing === 8     ||  // "KeepAlive";
+        thing === 9     ||  // "LocalTxMonitor";
+        thing === 10        // "LocalTxMonitor";
     );
 }
 
@@ -91,7 +96,8 @@ export function isMiniProtocol( protocol: number | string ): boolean
             protocol === MiniProtocol.LocalStateQuery   ||
             protocol === MiniProtocol.LocalTxSubmission ||
             protocol === MiniProtocol.TxSubmission      ||
-            protocol === MiniProtocol.LocalTxMonitor
+            protocol === MiniProtocol.LocalTxMonitor    ||
+            protocol === MiniProtocol.PeerSharing
         );
     }
     else if( typeof protocol === "string" )
