@@ -1,23 +1,23 @@
 import { CanBeCborString, Cbor, CborArray, CborBytes, CborObj, CborString, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
 import { isObject } from "@harmoniclabs/obj-utils"
 
-export interface ITxSubmitReplyTx {
+export interface ITxSubmitReplyTxs {
     txs: Uint8Array[] | readonly Uint8Array[]
 }
 
-export function isITxSubmitReplyTx( stuff: any ): stuff is ITxSubmitReplyTx
+export function isITxSubmitReplyTx( stuff: any ): stuff is ITxSubmitReplyTxs
 {
     return isObject( stuff ) && (
         Array.isArray( stuff.txs ) && stuff.txs.every( (thing: any) => thing instanceof Uint8Array )
     );
 }
 
-export class TxSubmitReplyTx
-    implements ToCbor, ToCborObj, ITxSubmitReplyTx
+export class TxSubmitReplyTxs
+    implements ToCbor, ToCborObj, ITxSubmitReplyTxs
 {
     readonly txs: readonly Uint8Array[];
 
-    constructor({ txs }: ITxSubmitReplyTx)
+    constructor({ txs }: ITxSubmitReplyTxs)
     {
         if(!isITxSubmitReplyTx({ txs })) throw new Error("invalid interface for 'TxSubmitReplyTx'");
 
@@ -50,11 +50,11 @@ export class TxSubmitReplyTx
         ]);
     }
 
-    static fromCbor( cbor: CanBeCborString ): TxSubmitReplyTx
+    static fromCbor( cbor: CanBeCborString ): TxSubmitReplyTxs
     {
-        return TxSubmitReplyTx.fromCborObj( Cbor.parse( forceCborString( cbor ) ) );
+        return TxSubmitReplyTxs.fromCborObj( Cbor.parse( forceCborString( cbor ) ) );
     }
-    static fromCborObj( cbor: CborObj ): TxSubmitReplyTx
+    static fromCborObj( cbor: CborObj ): TxSubmitReplyTxs
     {
         if(!(
             cbor instanceof CborArray &&
@@ -65,7 +65,7 @@ export class TxSubmitReplyTx
             cbor.array[1].array.every( thing => thing instanceof CborBytes )
         )) throw new Error("invalid CBOR for 'TxSubmitReplyTx");
 
-        return new TxSubmitReplyTx({
+        return new TxSubmitReplyTxs({
             txs: cbor.array[1].array.map( id => (id as CborBytes).buffer )
         });
     }

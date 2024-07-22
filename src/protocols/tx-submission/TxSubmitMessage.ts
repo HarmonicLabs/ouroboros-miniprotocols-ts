@@ -2,7 +2,7 @@ import { isObject } from "@harmoniclabs/obj-utils";
 import { TxSubmitDone, ITxSubmitDone } from "./messages/TxSubmitDone";
 import { TxSubmitInit, ITxSubmitInit } from "./messages/TxSubmitInit";
 import { TxSubmitReplyIds, ITxSubmitReplyIds } from "./messages/TxSubmitReplyIds";
-import { TxSubmitReplyTx, ITxSubmitReplyTx } from "./messages/TxSubmitReplyTx";
+import { TxSubmitReplyTxs, ITxSubmitReplyTxs } from "./messages/TxSubmitReplyTxs";
 import { TxSubmitRequestIds, ITxSubmitRequestIds } from "./messages/TxSubmitRequestIds";
 import { TxSubmitRequestTxs, ITxSubmitRequestTxs } from "./messages/TxSubmitRequestTxs";
 import { CanBeCborString, Cbor, CborArray, CborObj, CborUInt, forceCborString } from "@harmoniclabs/cbor";
@@ -12,7 +12,7 @@ export type TxSubmitMessage
     | TxSubmitRequestIds
     | TxSubmitReplyIds 
     | TxSubmitRequestTxs
-    | TxSubmitReplyTx
+    | TxSubmitReplyTxs
     | TxSubmitDone;
 
 export type ITxSubmitMessage 
@@ -20,7 +20,7 @@ export type ITxSubmitMessage
     | ITxSubmitRequestIds
     | ITxSubmitReplyIds 
     | ITxSubmitRequestTxs
-    | ITxSubmitReplyTx
+    | ITxSubmitReplyTxs
     | ITxSubmitDone;
 
 export function isLocalTxSubmitMessage( stuff: any ): stuff is TxSubmitMessage {
@@ -29,7 +29,7 @@ export function isLocalTxSubmitMessage( stuff: any ): stuff is TxSubmitMessage {
         stuff instanceof TxSubmitRequestIds ||
         stuff instanceof TxSubmitReplyIds   ||
         stuff instanceof TxSubmitRequestTxs ||
-        stuff instanceof TxSubmitReplyTx    ||
+        stuff instanceof TxSubmitReplyTxs   ||
         stuff instanceof TxSubmitDone
     );
 }
@@ -60,7 +60,7 @@ export function txSubmitMessageFromCborObj( cbor: CborObj ): TxSubmitMessage {
     if( idx === 0 ) return TxSubmitRequestIds.fromCborObj( cbor );
     if( idx === 1 ) return TxSubmitReplyIds.fromCborObj( cbor );
     if( idx === 2 ) return TxSubmitRequestTxs.fromCborObj( cbor );
-    if( idx === 3 ) return TxSubmitReplyTx.fromCborObj( cbor );
+    if( idx === 3 ) return TxSubmitReplyTxs.fromCborObj( cbor );
     if( idx === 4 ) return TxSubmitDone.fromCborObj( cbor );
 
     throw new Error("invalid CBOR for `TxSubmitMessage`; unknown index: " + idx);
