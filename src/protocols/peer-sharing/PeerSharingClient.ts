@@ -63,7 +63,7 @@ type MsgOf<Evt extends PeerSharingClientEvt> = {}
 
 export class PeerSharingClient {
 
-    readonly mplexer: Multiplexer;
+    readonly multiplexer: Multiplexer;
 
     clearListeners!: () => this;
 
@@ -78,7 +78,7 @@ export class PeerSharingClient {
     emit:                <EvtName extends PeerSharingClientEvt>( evt: EvtName, msg: MsgOf<EvtName> ) => boolean
     dispatchEvent:       <EvtName extends PeerSharingClientEvt>( evt: EvtName, msg: MsgOf<EvtName> ) => boolean
 
-    constructor( multiplexer: Multiplexer ) {
+    constructor( thisMultiplexer: Multiplexer ) {
         const self = this;
 
         const eventListeners: PeerSharingClientEvtListeners = {
@@ -163,7 +163,7 @@ export class PeerSharingClient {
 
         Object.defineProperties(
             this, {
-                mplexer:                { value: multiplexer, ...roDescr },
+                multiplexer:            { value: thisMultiplexer, ...roDescr },
                 clearListeners:         { value: clearListeners, ...roDescr },
                 removeAllListeners:     { value: clearListeners, ...roDescr },
                 addEventListener:       { value: addEventListener, ...roDescr },
@@ -181,7 +181,7 @@ export class PeerSharingClient {
         let prevBytes: Uint8Array | undefined = undefined;
         const queque: PeerSharingMessage[] = [];
 
-        multiplexer.on( MiniProtocol.PeerSharing, chunk => {
+        thisMultiplexer.on( MiniProtocol.PeerSharing, chunk => {
             if( !hasEventListeners() ) return;
 
             let offset: number = -1;
@@ -244,7 +244,7 @@ export class PeerSharingClient {
     }
 
     done(): void {
-        this.mplexer.send(
+        this.multiplexer.send(
             new PeerSharingDone().toCbor().toBuffer(),
             agencyHeader
         );
@@ -261,10 +261,11 @@ export class PeerSharingClient {
 
             self.addEventListener("response", handleResponse)
             
-            self.mplexer.send(
+            self.multiplexer.send(
                 new PeerSharingRequest({ amount }).toCbor().toBuffer(),
                 agencyHeader
             );
         });
     }
+    
 }
