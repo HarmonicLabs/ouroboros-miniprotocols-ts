@@ -24,7 +24,8 @@ type MultiplexerEvtListeners = {
     [MiniProtocol.LocalStateQuery]: MultiplexerEvtListener[]
     [MiniProtocol.LocalTxSubmission]: MultiplexerEvtListener[]
     [MiniProtocol.TxSubmission]: MultiplexerEvtListener[]
-    [MiniProtocol.LocalTxMonitor]: MultiplexerEvtListener[]
+    [MiniProtocol.LocalTxMonitor]: MultiplexerEvtListener[],
+    [MiniProtocol.PeerSharing]: MultiplexerEvtListener[]
     error: (( err: Error ) => void)[]
 };
 
@@ -143,6 +144,7 @@ export class Multiplexer
             [MiniProtocol.LocalStateQuery]: [],
             [MiniProtocol.KeepAlive]: [],
             [MiniProtocol.LocalTxMonitor]: [],
+            [MiniProtocol.PeerSharing]: [],
             error: []
         };
 
@@ -156,6 +158,7 @@ export class Multiplexer
             [MiniProtocol.LocalStateQuery]: [],
             [MiniProtocol.KeepAlive]: [],
             [MiniProtocol.LocalTxMonitor]: [],
+            [MiniProtocol.PeerSharing]: [],
             error: []
         };
 
@@ -251,6 +254,7 @@ export class Multiplexer
             eventListeners[MiniProtocol.LocalTxSubmission]  .length = 0;
             eventListeners[MiniProtocol.LocalStateQuery]    .length = 0;
             eventListeners[MiniProtocol.KeepAlive]          .length = 0;
+            eventListeners[MiniProtocol.PeerSharing]        .length = 0;
             eventListeners.error                            .length = 0;
 
             onceEventListeners[MiniProtocol.Handshake]          .length = 0;
@@ -261,6 +265,7 @@ export class Multiplexer
             onceEventListeners[MiniProtocol.LocalTxSubmission]  .length = 0;
             onceEventListeners[MiniProtocol.LocalStateQuery]    .length = 0;
             onceEventListeners[MiniProtocol.KeepAlive]          .length = 0;
+            onceEventListeners[MiniProtocol.PeerSharing]        .length = 0;
             onceEventListeners.error                            .length = 0;
         }
 
