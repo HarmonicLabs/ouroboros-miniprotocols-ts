@@ -357,28 +357,91 @@ export class LocalStateQueryClient
         });
     }
 
-    acquire( point?: IChainPoint ): void
+    sendAcquire( point?: IChainPoint ): void
     {
         this.mplexer.send(
             new QryAcquire({ point }).toCbor().toBuffer(),
             lsqClientHeader
         );
     }
+    acquire( point: IChainPoint ): Promise<void>
+    {
+        const lsqClient = this;
+        // acquire tip local chain sync
+        return new Promise<void>( (resolve, reject) => {
 
-    query( query: CborObj ): void
+            function handleFailure( msg: QryFailure )
+            {
+                lsqClient.removeEventListener("acquired", resolveAcquired)
+                lsqClient.removeEventListener("failure", handleFailure)
+                reject( msg );
+            }
+            function resolveAcquired()
+            {
+                lsqClient.removeEventListener("acquired", resolveAcquired)
+                lsqClient.removeEventListener("failure", handleFailure);
+                resolve();
+            }
+            lsqClient.on("failure", handleFailure);
+            lsqClient.on("acquired", resolveAcquired);
+
+            lsqClient.sendAcquire( point );
+        });
+    }
+
+    sendQuery( query: CborObj ): void
     {
         this.mplexer.send(
             new QryQuery({ query }).toCbor().toBuffer(),
             lsqClientHeader
         );
     }
+    query( query: CborObj, timeout?: number | undefined ): Promise<QryResult>
+    {
+        const lsqClient = this;
+        // acquire tip local chain sync
+        return new Promise( (resolve, reject) => {
+            let timeoutHandle: any = undefined;
 
-    release(): void
+            function removeTimeout()
+            {
+                if( typeof timeout !== "number" ) return;
+                clearTimeout( timeoutHandle );
+            }
+
+            function handleResult( msg: QryResult )
+            {
+                lsqClient.removeEventListener("result", handleResult);
+                removeTimeout();
+                resolve( msg );
+            }
+            function handleTimeout()
+            {
+                lsqClient.removeEventListener("result", handleResult);
+                removeTimeout();
+                reject( new Error("timed-out") )
+            }
+
+            if( typeof timeout === "number" )
+            {
+                timeoutHandle = setTimeout( handleTimeout, timeout );
+            }
+            lsqClient.on( "result", handleResult );
+
+            lsqClient.sendQuery( query );
+        });
+    }
+
+    sendRelease(): void
     {
         this.mplexer.send(
             new QryRelease().toCbor().toBuffer(),
             lsqClientHeader
-        )
+        );
+    }
+    release(): void
+    {
+        this.sendRelease();
     }
 
     done(): void
@@ -390,38 +453,27 @@ export class LocalStateQueryClient
         this.clearListeners();
     }
 
-    requestCurrentEra( timeout?: number ): Promise<CborUInt>
+    async requestCurrentEra( timeout?: number ): Promise<bigint>
     {
-        return new Promise<CborUInt>( ( resolve, reject ) => {
-            let _timeout: any;
-
-            function resolveOnResult( { result }: QryResult )
-            {
-                typeof timeout === "number" && clearTimeout( _timeout );
-                resolve( result as CborUInt );
-            }
-
-            if( typeof timeout === "number" )
-            {
-                _timeout = setTimeout(() => {
-                    this.removeEventListener("result", resolveOnResult);
-                    reject()
-                }, timeout); 
-            }
-
-            this.once("result", resolveOnResult );
-    
-            this.query(
+        const qry = await this.query(
+            new CborArray([
+                new CborUInt( 0 ),
                 new CborArray([
-                    new CborUInt( 0 ),
+                    new CborUInt( 2 ),
                     new CborArray([
-                        new CborUInt( 2 ),
-                        new CborArray([
-                            new CborUInt( 1 )
-                        ])
+                        new CborUInt( 1 )
                     ])
                 ])
-            );
-        });
+            ]),
+            timeout
+        );
+
+        if(!( qry.result instanceof CborUInt ))
+        throw new Error(
+            "unexpected cbor result to query era; received: " +
+            qry.toCbor().toString() 
+        );
+
+        return qry.result.num;
     }
 }

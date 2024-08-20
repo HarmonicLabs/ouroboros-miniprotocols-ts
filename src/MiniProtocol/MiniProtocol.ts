@@ -69,7 +69,7 @@ export function isMiniProtocolNum( thing: any ): thing is MiniProtocolNum
         thing === 7     ||  // "LocalStateQuery"
         thing === 8     ||  // "KeepAlive";
         thing === 9     ||  // "LocalTxMonitor";
-        thing === 10        // "LocalTxMonitor";
+        thing === 10        // "PeerSharing";
     );
 }
 

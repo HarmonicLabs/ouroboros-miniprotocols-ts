@@ -1,4 +1,5 @@
 import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
+import { MiniProtocol, miniProtocolToString } from "../../../MiniProtocol";
 
 export enum QryFailureReason {
     pointTooOld = 0,
@@ -38,6 +39,24 @@ export class QryFailure
             }
         );
     };
+
+    toJSON()
+    {
+        return this.toJson();
+    }
+    toJson()
+    {
+        return {
+            protocol: miniProtocolToString( MiniProtocol.LocalStateQuery ),
+            message: "QryFailure",
+            data: {
+                reason:
+                    typeof this.reason === "number" ?
+                        QryFailureReason[ this.reason ] :
+                        this.reason
+            }
+        }
+    }
 
     toCbor(): CborString
     {
