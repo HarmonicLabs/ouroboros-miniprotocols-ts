@@ -61,7 +61,7 @@ function msgToName( msg: LocalTxSubmitMessage ): LocalTxSubmitClientEvt | undefi
     return undefined;
 }
 
-export type TxSubmitResult = {
+export type LocalTxSubmitResult = {
     ok: true,
     /** `LocalTxSubmitAccept` carries no informatons */
     msg: undefined
@@ -254,7 +254,7 @@ export class LocalTxSubmitClient
         });
     }
 
-    submit( txData: Uint8Array ): Promise<TxSubmitResult>
+    submit( txData: Uint8Array ): Promise<LocalTxSubmitResult>
     {
         const self = this;
         return new Promise( resolve => {
