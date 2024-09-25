@@ -1,8 +1,10 @@
 import { TxSubmitMessage, txSubmitMessageFromCborObj } from "./TxSubmitMessage";
 import { AddEvtListenerOpts } from "../../common/AddEvtListenerOpts";
-import { TxSubmitRequestTxs } from "./messages/TxSubmitRequestTxs";
-import { TxSubmitRequestIds } from "./messages/TxSubmitRequestIds";
+import { TxSubmitReplyIds } from "./messages/TxSubmitReplyIds";
+import { TxSubmitReplyTxs } from "./messages/TxSubmitReplyTxs";
 import { Multiplexer } from "../../multiplexer/Multiplexer";
+import { TxSubmitDone } from "./messages/TxSubmitDone";
+import { TxSubmitInit } from "./messages/TxSubmitInit";
 import { Cbor, CborObj } from "@harmoniclabs/cbor";
 import { MiniProtocol } from "../../MiniProtocol";
 import { IMempool } from "./interfaces";
@@ -13,16 +15,18 @@ const roDescr = {
     configurable: false
 };
 
-type TxSubmitClientEvtListener = ( msg: TxSubmitMessage ) => void;
+type TxSubmitServerEvtListener = ( msg: TxSubmitMessage ) => void;
 
-type TxSubmitClientEvtListeners = { 
-    requestIds: TxSubmitClientEvtListener[],
-    requestTxs: TxSubmitClientEvtListener[]
+type TxSubmitServerEvtListeners = {
+    init: TxSubmitServerEvtListener[],
+    replyIds: TxSubmitServerEvtListener[],
+    replyTxs: TxSubmitServerEvtListener[],
+    done  : TxSubmitServerEvtListener[]
 };
 
-type TxSubmitClientEvt = keyof TxSubmitClientEvtListeners;
+type TxSubmitServerEvt = keyof TxSubmitServerEvtListeners;
 
-function _clearListeners( listeners: TxSubmitClientEvtListeners, evt?: TxSubmitClientEvt ) 
+function _clearListeners( listeners: TxSubmitServerEvtListeners, evt?: TxSubmitServerEvt ) 
 {
     const arr = listeners[evt!];
 
@@ -31,30 +35,38 @@ function _clearListeners( listeners: TxSubmitClientEvtListeners, evt?: TxSubmitC
         return;
     }
 
-    listeners.requestIds.length = 0;
-    listeners.requestTxs.length = 0;
+    listeners.init.length = 0;
+    listeners.replyIds.length = 0;
+    listeners.replyTxs.length = 0;
+    listeners.done.length = 0;
 }
 
-function _hasEventListeners( listeners: TxSubmitClientEvtListeners ): boolean 
+function _hasEventListeners( listeners: TxSubmitServerEvtListeners ): boolean 
 {
     return (
-        listeners.requestIds.length > 0 ||
-        listeners.requestTxs.length > 0
+        listeners.init.length > 0       ||
+        listeners.replyIds.length > 0   ||
+        listeners.replyTxs.length > 0   ||
+        listeners.done.length   > 0
     );
 }
 
-function msgToName( msg: TxSubmitMessage ): TxSubmitClientEvt | undefined 
+function msgToName( msg: TxSubmitMessage ): TxSubmitServerEvt | undefined 
 {
-    if( msg instanceof TxSubmitRequestIds ) return "requestIds";
-    if( msg instanceof TxSubmitRequestTxs ) return "requestTxs";
+    if( msg instanceof TxSubmitInit ) return "done";
+    if( msg instanceof TxSubmitReplyIds ) return "replyIds";
+    if( msg instanceof TxSubmitReplyTxs ) return "replyTxs";
+    if( msg instanceof TxSubmitDone )   return "done";
 
     return undefined;
 }
 
-type EvtListenerOf<Evt extends TxSubmitClientEvt> = ( ...args: any[] ) => any
-type MsgOf<Evt extends TxSubmitClientEvt> = {}
+export type TxSubmitResult = { ok: true, msg: undefined } | { ok: false, msg: bigint }
 
-export class TxSubmitClient 
+type EvtListenerOf<Evt extends TxSubmitServerEvt> = ( ...args: any[] ) => any
+type MsgOf<Evt extends TxSubmitServerEvt> = {}
+
+export class TxSubmitServer 
 {
     readonly _multiplexer: Multiplexer;
     get multiplexer(): Multiplexer 
@@ -62,43 +74,39 @@ export class TxSubmitClient
         return this._multiplexer;
     }
 
-    readonly _mempool: IMempool;
-    get mempool(): IMempool 
-    {
-        return this._mempool;
-    }
-
     clearListeners!: () => void;
 
-    addEventListener:    <EvtName extends TxSubmitClientEvt>( evt: EvtName, listener: EvtListenerOf<EvtName>, options?: AddEvtListenerOpts ) => this
-    addListener:         <EvtName extends TxSubmitClientEvt>( evt: EvtName, listener: EvtListenerOf<EvtName> ) => this
-    on:                  <EvtName extends TxSubmitClientEvt>( evt: EvtName, listener: EvtListenerOf<EvtName> ) => this
-    once:                <EvtName extends TxSubmitClientEvt>( evt: EvtName, listener: EvtListenerOf<EvtName> ) => this
-    removeEventListener: <EvtName extends TxSubmitClientEvt>( evt: EvtName, listener: EvtListenerOf<EvtName> ) => this
-    removeListener:      <EvtName extends TxSubmitClientEvt>( evt: EvtName, listener: EvtListenerOf<EvtName> ) => this
-    off:                 <EvtName extends TxSubmitClientEvt>( evt: EvtName, listener: EvtListenerOf<EvtName> ) => this
-    removeAllListeners:  ( event?: TxSubmitClientEvt ) => this
-    emit:                <EvtName extends TxSubmitClientEvt>( evt: EvtName, msg: MsgOf<EvtName> ) => boolean
-    dispatchEvent:       <EvtName extends TxSubmitClientEvt>( evt: EvtName, msg: MsgOf<EvtName> ) => boolean
+    addEventListener:    <EvtName extends TxSubmitServerEvt>( evt: EvtName, listener: EvtListenerOf<EvtName>, options?: AddEvtListenerOpts ) => this
+    addListener:         <EvtName extends TxSubmitServerEvt>( evt: EvtName, listener: EvtListenerOf<EvtName> ) => this
+    on:                  <EvtName extends TxSubmitServerEvt>( evt: EvtName, listener: EvtListenerOf<EvtName> ) => this
+    once:                <EvtName extends TxSubmitServerEvt>( evt: EvtName, listener: EvtListenerOf<EvtName> ) => this
+    removeEventListener: <EvtName extends TxSubmitServerEvt>( evt: EvtName, listener: EvtListenerOf<EvtName> ) => this
+    removeListener:      <EvtName extends TxSubmitServerEvt>( evt: EvtName, listener: EvtListenerOf<EvtName> ) => this
+    off:                 <EvtName extends TxSubmitServerEvt>( evt: EvtName, listener: EvtListenerOf<EvtName> ) => this
+    removeAllListeners:  ( event?: TxSubmitServerEvt ) => this
+    emit:                <EvtName extends TxSubmitServerEvt>( evt: EvtName, msg: MsgOf<EvtName> ) => boolean
+    dispatchEvent:       <EvtName extends TxSubmitServerEvt>( evt: EvtName, msg: MsgOf<EvtName> ) => boolean
 
-    constructor( 
-        thisMultiplexer: Multiplexer,
-        thisMempool: IMempool
-    ) 
+    constructor( thisMultiplexer: Multiplexer ) 
     {
+
         const self = this;
 
-        const eventListeners: TxSubmitClientEvtListeners = {
-            requestIds: [],
-            requestTxs: []
+        const eventListeners: TxSubmitServerEvtListeners = {
+            init: [],
+            replyIds: [],
+            replyTxs: [],
+            done: []
         };
 
-        const onceEventListeners: TxSubmitClientEvtListeners = {
-            requestIds: [],
-            requestTxs: []
+        const onceEventListeners: TxSubmitServerEvtListeners = {
+            init: [],
+            replyIds: [],
+            replyTxs: [],
+            done: []
         };
 
-        function clearListeners( evt?: TxSubmitClientEvt ): void 
+        function clearListeners( evt?: TxSubmitServerEvt ): void 
         {
             _clearListeners( eventListeners, evt );
             _clearListeners( onceEventListeners, evt );
@@ -109,10 +117,10 @@ export class TxSubmitClient
             return _hasEventListeners( eventListeners ) || _hasEventListeners( onceEventListeners );
         }
 
-        function addEventListenerOnce<EvtName extends TxSubmitClientEvt>( 
+        function addEventListenerOnce<EvtName extends TxSubmitServerEvt>( 
             evt: EvtName, 
             listener: EvtListenerOf<EvtName> 
-        ): typeof self 
+        ) : typeof self 
         {
             const listeners = onceEventListeners[ evt ];
 
@@ -123,7 +131,7 @@ export class TxSubmitClient
             return self;
         }
 
-        function addEventListener<EvtName extends TxSubmitClientEvt>( 
+        function addEventListener<EvtName extends TxSubmitServerEvt>( 
             evt: EvtName, 
             listener: EvtListenerOf<EvtName>, 
             options?: AddEvtListenerOpts 
@@ -140,7 +148,7 @@ export class TxSubmitClient
             return self;
         }
 
-        function removeEventListener<EvtName extends TxSubmitClientEvt>(
+        function removeEventListener<EvtName extends TxSubmitServerEvt>(
             evt: EvtName, 
             listener: EvtListenerOf<EvtName>
         ): typeof self 
@@ -155,7 +163,7 @@ export class TxSubmitClient
             return self;
         }
 
-        function dispatchEvent( evt: TxSubmitClientEvt, msg: TxSubmitMessage ) 
+        function dispatchEvent( evt: TxSubmitServerEvt, msg: TxSubmitMessage ) 
         {
             let listeners = eventListeners[ evt ]
 
@@ -164,13 +172,13 @@ export class TxSubmitClient
             for( const cb of listeners ) cb( msg );
 
             listeners = onceEventListeners[ evt ];
-            let cb: TxSubmitClientEvtListener;
+            let cb: TxSubmitServerEvtListener;
 
             while( cb = listeners.shift()! ) cb( msg );
 
             return true;
         }
-        
+
         let prevBytes: Uint8Array | undefined = undefined;
         const queque: TxSubmitMessage[] = [];
 
@@ -221,7 +229,7 @@ export class TxSubmitClient
                 }
             }
 
-            let msgStr: TxSubmitClientEvt;
+            let msgStr: TxSubmitServerEvt;
 
             while( msg = queque.pop()! ) 
             {
@@ -239,7 +247,6 @@ export class TxSubmitClient
         });
 
         this._multiplexer = thisMultiplexer;
-        this._mempool = thisMempool;
 
         Object.defineProperties(
             this, {
@@ -259,6 +266,6 @@ export class TxSubmitClient
 
     }
 
-    //TODO: tx-submission client messages implementation
+    //TODO: tx-submission server messages implementation
         
 }

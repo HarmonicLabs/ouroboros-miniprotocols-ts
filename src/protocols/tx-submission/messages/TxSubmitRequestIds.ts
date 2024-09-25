@@ -1,8 +1,10 @@
-import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
+import { CanBeCborString, Cbor, CborArray, CborObj, CborSimple, CborString, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
+import { canBeUInteger, forceUInteger } from "../../types/ints";
 import { isObject } from "@harmoniclabs/obj-utils";
-import { canBeUInteger, forceBigUInt, forceUInteger } from "../../types/ints";
+import { assert } from "../../utils/assert";
 
-export interface ITxSubmitRequestIds {
+export interface ITxSubmitRequestIds 
+{
     blocking: boolean,
     knownTxCount: number | bigint
     requestedTxCount: number | bigint
@@ -10,7 +12,8 @@ export interface ITxSubmitRequestIds {
 
 export function isITxSubmitRequestIds( stuff: any ): stuff is TxSubmitRequestIds
 {
-    return isObject( stuff ) && (
+    return(
+        isObject( stuff ) && 
         typeof stuff.blocking === "boolean" &&
         canBeUInteger( stuff.knownTxCount ) &&
         canBeUInteger( stuff.requestedTxCount )
@@ -18,41 +21,43 @@ export function isITxSubmitRequestIds( stuff: any ): stuff is TxSubmitRequestIds
 }
 
 /**
- * The server requests aviable transactions ids
+ * Server request of available transactions ids
 **/
 export class TxSubmitRequestIds
-    implements ToCbor, ToCborObj, TxSubmitRequestIds
+    implements ToCbor, ToCborObj, ITxSubmitRequestIds
 {
-    readonly blocking: boolean
+    private readonly _blocking: boolean;
+    get blocking(): boolean { 
+        return this._blocking;
+    }
 
-    readonly knownTxCount: number;
-    readonly requestedTxCount: number
+    private readonly _knownTxCount: number;
+    get knownTxCount(): number {
+        return this._knownTxCount;
+    }
+
+    private readonly _requestedTxCount: number;
+    get requestedTxCount(): number {
+        return this._requestedTxCount;
+    }
     
-    constructor({ blocking, knownTxCount, requestedTxCount }: ITxSubmitRequestIds)
+    constructor(
+        { 
+            blocking, 
+            knownTxCount, 
+            requestedTxCount 
+        }
+        : ITxSubmitRequestIds 
+    )
     {
-
-        Object.defineProperties(
-            this, {
-                blocking: {
-                    value: Boolean( blocking ),
-                    writable: false,
-                    enumerable: true,
-                    configurable: false
-                },
-                knownTxCount: {
-                    value: forceUInteger( knownTxCount ),
-                    writable: false,
-                    enumerable: true,
-                    configurable: false
-                },
-                requestedTxCount: {
-                    value: forceUInteger( requestedTxCount ),
-                    writable: false,
-                    enumerable: true,
-                    configurable: false
-                },
-            }
-        )
+        assert( 
+            isITxSubmitRequestIds( { blocking, knownTxCount, requestedTxCount } ),
+            "invalid TxSubmitRequestIds message"
+        );
+        
+        this._blocking = Boolean( blocking );
+        this._knownTxCount = forceUInteger( knownTxCount );
+        this._requestedTxCount = forceUInteger( requestedTxCount );
     }
 
     toCbor(): CborString
@@ -62,9 +67,10 @@ export class TxSubmitRequestIds
     toCborObj()
     {
         return new CborArray([
-            new CborUInt(0),
-            new CborUInt(this.knownTxCount),
-            new CborUInt(this.requestedTxCount)
+            new CborUInt( 0 ),
+            new CborSimple( this.blocking ? 1 : 0 ),
+            new CborUInt( this.knownTxCount ),
+            new CborUInt( this.requestedTxCount )
         ]);
     }
 
@@ -76,17 +82,28 @@ export class TxSubmitRequestIds
     {
         if(!(
             cbor instanceof CborArray &&
-            cbor.array.length >= 3 &&
-            cbor.array[0] instanceof CborUInt &&
-            cbor.array[0].num === BigInt(0) &&
-            cbor.array[1] instanceof CborUInt &&
-            cbor.array[2] instanceof CborUInt
-        )) throw new Error("invalid CBOR for 'TxSubmitRequestIds");
+            cbor.array.length >= 4 
+        )) throw new Error( "invalid CBOR for 'TxSubmitRequestIds" );
+
+        const [ 
+            cborMsgTag,
+            cborBlocking, 
+            cborKnownTxCount, 
+            cborRequestedTxCount 
+        ] = cbor.array;
+
+        if(!(
+            cborMsgTag instanceof CborUInt &&
+            Number( cborMsgTag.num ) === 0 &&
+            cborBlocking instanceof CborSimple &&
+            cborKnownTxCount instanceof CborUInt &&
+            cborRequestedTxCount instanceof CborUInt
+        )) throw new Error( "invalid CBOR for 'TxSubmitRequestIds" );
 
         return new TxSubmitRequestIds({
-            blocking: false,
-            knownTxCount: cbor.array[1].num,
-            requestedTxCount: cbor.array[2].num,
+            blocking: cborBlocking.simple === 1 ? true : false,
+            knownTxCount: cborKnownTxCount.num,
+            requestedTxCount: cborRequestedTxCount.num,
         });
     }
 }

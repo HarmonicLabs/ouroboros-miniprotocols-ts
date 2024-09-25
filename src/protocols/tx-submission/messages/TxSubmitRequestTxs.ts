@@ -1,34 +1,37 @@
 import { CanBeCborString, Cbor, CborArray, CborBytes, CborObj, CborString, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
 import { isObject } from "@harmoniclabs/obj-utils"
+import { assert } from "../../utils/assert";
 
-export interface ITxSubmitRequestTxs {
+export interface ITxSubmitRequestTxs 
+{
     ids: Uint8Array[] | readonly Uint8Array[]
 }
 
 export function isITxSubmitRequestTxs( stuff: any ): stuff is ITxSubmitRequestTxs
 {
-    return isObject( stuff ) && (
-        Array.isArray( stuff.ids ) && stuff.ids.every( (thing: any) => thing instanceof Uint8Array )
+    return(
+        isObject( stuff ) && 
+        Array.isArray( stuff.ids ) && 
+        stuff.ids.every( ( thing: any ) => thing instanceof Uint8Array )
     );
 }
 
+/**
+ * Server request of available transactions
+**/
 export class TxSubmitRequestTxs
     implements ToCbor, ToCborObj, ITxSubmitRequestTxs
 {
-    readonly ids: readonly Uint8Array[];
+    private readonly _ids: readonly Uint8Array[];
+    get ids(): readonly Uint8Array[] {
+        return this._ids;
+    }
 
-    constructor({ ids }: ITxSubmitRequestTxs)
+    constructor( { ids }: ITxSubmitRequestTxs )
     {
-        if(!isITxSubmitRequestTxs({ ids })) throw new Error("invalid interface for 'TxSubmitRequestTxs'");
+        assert(!isITxSubmitRequestTxs({ ids }), "invalid interface for 'TxSubmitRequestTxs'" );
 
-        Object.defineProperty(
-            this, "ids", {
-                value: Object.freeze( ids.slice() ),
-                writable: false,
-                enumerable: true,
-                configurable: false
-            }
-        );
+        this._ids = Object.freeze( ids.slice() );
     }
 
     toCbor(): CborString
@@ -38,9 +41,9 @@ export class TxSubmitRequestTxs
     toCborObj()
     {
         return new CborArray([
-            new CborUInt(2),
+            new CborUInt( 2 ),
             new CborArray(
-                this.ids.map( id => new CborBytes( id ) ),
+                this.ids.map(( id ) => new CborBytes( id )),
                 {
                     // CDDL specification comment
                     // ; The codec only accepts infinit-length list encoding for tsIdList!
@@ -58,15 +61,22 @@ export class TxSubmitRequestTxs
     {
         if(!(
             cbor instanceof CborArray &&
-            cbor.array.length >= 2 &&
-            cbor.array[0] instanceof CborUInt &&
-            cbor.array[0].num === BigInt(2) &&
-            cbor.array[1] instanceof CborArray &&
-            cbor.array[1].array.every( thing => thing instanceof CborBytes )
+            cbor.array.length >= 2
+        )) throw new Error("invalid CBOR for 'TxSubmitRequestTxs");
+
+        const [ 
+            cborMsgTag, 
+            cborIds 
+        ] = cbor.array;
+
+        if(!(
+                cborMsgTag instanceof CborUInt &&
+                Number( cborMsgTag.num ) === 2 &&
+                cborIds instanceof CborArray
         )) throw new Error("invalid CBOR for 'TxSubmitRequestTxs");
 
         return new TxSubmitRequestTxs({
-            ids: cbor.array[1].array.map( id => (id as CborBytes).buffer )
+            ids: cborIds.array.map( ( id ) => ( id as CborBytes ).buffer )
         });
     }
 }
