@@ -2,57 +2,46 @@ import { TxSubmitMessage, txSubmitMessageFromCborObj } from "./TxSubmitMessage";
 import { AddEvtListenerOpts } from "../../common/AddEvtListenerOpts";
 import { TxSubmitRequestTxs } from "./messages/TxSubmitRequestTxs";
 import { TxSubmitRequestIds } from "./messages/TxSubmitRequestIds";
+import { ITxIdAndSize, TxSubmitDone, TxSubmitReplyIds, TxSubmitReplyTxs } from "./messages";
 import { Multiplexer } from "../../multiplexer/Multiplexer";
-import { Cbor, CborObj } from "@harmoniclabs/cbor";
+import { Cbor, CborArray, CborObj } from "@harmoniclabs/cbor";
 import { MiniProtocol } from "../../MiniProtocol";
-import { IMempool } from "./interfaces";
+import { IMempool, TxHashAndSize } from "./interfaces";
+import { MempoolTxHash } from "./interfaces/types";
 
-const roDescr = {
-    writable: false,
-    enumerable: true,
-    configurable: false
+type TxSubmitClientEvt = keyof TxSubmitClientEvtListeners & string;
+
+type TxSubmitClientEvtListeners = {
+    requestIds:     TxSubmitClientEvtListener[],
+    requestTxs:     TxSubmitClientEvtListener[]
 };
 
 type TxSubmitClientEvtListener = ( msg: TxSubmitMessage ) => void;
 
-type TxSubmitClientEvtListeners = { 
-    requestIds: TxSubmitClientEvtListener[],
-    requestTxs: TxSubmitClientEvtListener[]
-};
-
-type TxSubmitClientEvt = keyof TxSubmitClientEvtListeners;
-
-function _clearListeners( listeners: TxSubmitClientEvtListeners, evt?: TxSubmitClientEvt ) 
-{
-    const arr = listeners[evt!];
-
-    if( Array.isArray( arr ) ) {
-        arr.length = 0;
-        return;
-    }
-
-    listeners.requestIds.length = 0;
-    listeners.requestTxs.length = 0;
-}
-
-function _hasEventListeners( listeners: TxSubmitClientEvtListeners ): boolean 
-{
-    return (
-        listeners.requestIds.length > 0 ||
-        listeners.requestTxs.length > 0
-    );
-}
+type MsgOf<EvtName extends TxSubmitClientEvt> =
+    EvtName extends "requestIds"    ? TxSubmitRequestIds    :
+    EvtName extends "requestTxs"    ? TxSubmitRequestTxs    :
+    never                                                   ;
 
 function msgToName( msg: TxSubmitMessage ): TxSubmitClientEvt | undefined 
 {
-    if( msg instanceof TxSubmitRequestIds ) return "requestIds";
-    if( msg instanceof TxSubmitRequestTxs ) return "requestTxs";
+    if( msg instanceof TxSubmitRequestIds )   return "requestIds";
+    if( msg instanceof TxSubmitRequestTxs )   return "requestTxs";
 
     return undefined;
 }
 
+function isTxSubClientEvtName( stuff: any ): stuff is TxSubmitClientEvt
+{
+    return (
+        stuff === "requestIds"        ||
+        stuff === "requestTxs"
+    );
+}
+
+export type TxSubmitResult = { ok: true, msg: undefined } | { ok: false, msg: bigint }
+
 type EvtListenerOf<Evt extends TxSubmitClientEvt> = ( ...args: any[] ) => any
-type MsgOf<Evt extends TxSubmitClientEvt> = {}
 
 export class TxSubmitClient 
 {
@@ -68,130 +57,57 @@ export class TxSubmitClient
         return this._mempool;
     }
 
-    clearListeners!: () => void;
+    private _eventListeners: TxSubmitClientEvtListeners = Object.freeze({
+        requestIds:     [],
+        requestTxs:     []
+    });
+    get eventListeners(): TxSubmitClientEvtListeners 
+    {
+        return this._eventListeners;
+    }
 
-    addEventListener:    <EvtName extends TxSubmitClientEvt>( evt: EvtName, listener: EvtListenerOf<EvtName>, options?: AddEvtListenerOpts ) => this
+    private _onceEventListeners: TxSubmitClientEvtListeners = Object.freeze({
+        requestIds:     [],
+        requestTxs:     []
+    });
+    get onceEventListeners(): TxSubmitClientEvtListeners 
+    {
+        return this._onceEventListeners;
+    }
+    
     addListener:         <EvtName extends TxSubmitClientEvt>( evt: EvtName, listener: EvtListenerOf<EvtName> ) => this
     on:                  <EvtName extends TxSubmitClientEvt>( evt: EvtName, listener: EvtListenerOf<EvtName> ) => this
     once:                <EvtName extends TxSubmitClientEvt>( evt: EvtName, listener: EvtListenerOf<EvtName> ) => this
-    removeEventListener: <EvtName extends TxSubmitClientEvt>( evt: EvtName, listener: EvtListenerOf<EvtName> ) => this
     removeListener:      <EvtName extends TxSubmitClientEvt>( evt: EvtName, listener: EvtListenerOf<EvtName> ) => this
     off:                 <EvtName extends TxSubmitClientEvt>( evt: EvtName, listener: EvtListenerOf<EvtName> ) => this
     removeAllListeners:  ( event?: TxSubmitClientEvt ) => this
     emit:                <EvtName extends TxSubmitClientEvt>( evt: EvtName, msg: MsgOf<EvtName> ) => boolean
-    dispatchEvent:       <EvtName extends TxSubmitClientEvt>( evt: EvtName, msg: MsgOf<EvtName> ) => boolean
 
-    constructor( 
-        thisMultiplexer: Multiplexer,
-        thisMempool: IMempool
-    ) 
-    {
-        const self = this;
+    constructor( thisMultiplexer: Multiplexer ) 
+    { 
+        this._multiplexer = thisMultiplexer;
 
-        const eventListeners: TxSubmitClientEvtListeners = {
-            requestIds: [],
-            requestTxs: []
-        };
-
-        const onceEventListeners: TxSubmitClientEvtListeners = {
-            requestIds: [],
-            requestTxs: []
-        };
-
-        function clearListeners( evt?: TxSubmitClientEvt ): void 
-        {
-            _clearListeners( eventListeners, evt );
-            _clearListeners( onceEventListeners, evt );
-        }
-
-        function hasEventListeners(): boolean 
-        {
-            return _hasEventListeners( eventListeners ) || _hasEventListeners( onceEventListeners );
-        }
-
-        function addEventListenerOnce<EvtName extends TxSubmitClientEvt>( 
-            evt: EvtName, 
-            listener: EvtListenerOf<EvtName> 
-        ): typeof self 
-        {
-            const listeners = onceEventListeners[ evt ];
-
-            if( !Array.isArray( listeners ) ) return self;
-
-            listeners.push( listener );
-
-            return self;
-        }
-
-        function addEventListener<EvtName extends TxSubmitClientEvt>( 
-            evt: EvtName, 
-            listener: EvtListenerOf<EvtName>, 
-            options?: AddEvtListenerOpts 
-        ): typeof self 
-        {
-            if( options?.once ) return addEventListenerOnce( evt, listener );
-            
-            const listeners = eventListeners[ evt ];
-
-            if( !Array.isArray( listeners ) ) return self;
-
-            listeners.push( listener );
-
-            return self;
-        }
-
-        function removeEventListener<EvtName extends TxSubmitClientEvt>(
-            evt: EvtName, 
-            listener: EvtListenerOf<EvtName>
-        ): typeof self 
-        {
-            let listeners = eventListeners[evt];
-
-            if( !Array.isArray( listeners ) ) return self;
-
-            eventListeners[evt] = listeners.filter( fn => fn !== listener );
-            onceEventListeners[evt] = onceEventListeners[evt].filter( fn => fn !== listener );
-
-            return self;
-        }
-
-        function dispatchEvent( evt: TxSubmitClientEvt, msg: TxSubmitMessage ) 
-        {
-            let listeners = eventListeners[ evt ]
-
-            if( !listeners ) return;
-
-            for( const cb of listeners ) cb( msg );
-
-            listeners = onceEventListeners[ evt ];
-            let cb: TxSubmitClientEvtListener;
-
-            while( cb = listeners.shift()! ) cb( msg );
-
-            return true;
-        }
-        
         let prevBytes: Uint8Array | undefined = undefined;
         const queque: TxSubmitMessage[] = [];
 
-        thisMultiplexer.on( MiniProtocol.TxSubmission, chunk => {
-            if( !hasEventListeners() ) return;
-
+        this.multiplexer.on( MiniProtocol.TxSubmission, ( chunk ) => {
+            if( !this.hasEventListeners() ) return;
+    
             let offset: number = -1;
             let thing: { parsed: CborObj, offset: number };
-
+    
             let msg: TxSubmitMessage;
-
+    
             if( prevBytes ) 
             {
                 const tmp = new Uint8Array( prevBytes.length + chunk.length );
-
+    
                 tmp.set( prevBytes, 0 );
                 tmp.set( chunk, prevBytes.length );
                 chunk = tmp;
                 prevBytes = undefined;
             }
-
+    
             while( true ) 
             {
                 try 
@@ -205,10 +121,10 @@ export class TxSubmitClient
                 }
                 
                 offset = thing.offset;
-
+    
                 msg = txSubmitMessageFromCborObj( thing.parsed )
                 queque.unshift( msg );
-
+    
                 if( offset < chunk.length ) 
                 {
                     chunk = chunk.subarray( offset );
@@ -220,45 +136,213 @@ export class TxSubmitClient
                     break;
                 }
             }
-
+    
             let msgStr: TxSubmitClientEvt;
-
+    
             while( msg = queque.pop()! ) 
             {
                 msgStr = msgToName( msg )!;
-
+    
                 if( !msgStr ) continue;
-
-                const listeners = eventListeners[ msgStr ];
-
+    
+                const listeners = this.eventListeners[ msgStr ];
+    
                 for( const cb of listeners ) 
                 {
                     void cb( msg );
                 }
             }
         });
-
-        this._multiplexer = thisMultiplexer;
-        this._mempool = thisMempool;
-
-        Object.defineProperties(
-            this, {
-                clearListeners:         { value: clearListeners, ...roDescr },
-                removeAllListeners:     { value: clearListeners, ...roDescr },
-                addEventListener:       { value: addEventListener, ...roDescr },
-                addListener:            { value: addEventListener, ...roDescr },
-                on:                     { value: addEventListener, ...roDescr },
-                once:                   { value: addEventListenerOnce, ...roDescr },
-                removeEventListener:    { value: removeEventListener, ...roDescr },
-                removeListener:         { value: removeEventListener, ...roDescr },
-                off:                    { value: removeEventListener, ...roDescr },
-                dispatchEvent:          { value: dispatchEvent, ...roDescr },
-                emit:                   { value: dispatchEvent, ...roDescr },
-            }
-        );
-
     }
 
-    //TODO: tx-submission client messages implementation
+    hasEventListeners(): boolean 
+    {
+        return this._hasEventListeners( this.eventListeners ) || this._hasEventListeners( this.onceEventListeners );
+    }
+    private _hasEventListeners( listeners: TxSubmitClientEvtListeners ): boolean 
+    {
+        return (
+            listeners.requestIds.length > 0     ||
+            listeners.requestTxs.length > 0
+        );
+    }
+
+    addEventListenerOnce<EvtName extends TxSubmitClientEvt>( evt: EvtName, listener: EvtListenerOf<EvtName> ) : typeof self 
+    {
+        const listeners = this.onceEventListeners[ evt ];
+
+        if( !Array.isArray( listeners ) ) return self;
+
+        listeners.push( listener );
+
+        return self;
+    }
+
+    addEventListener<EvtName extends TxSubmitClientEvt>( evt: EvtName, listener: EvtListenerOf<EvtName>, options?: AddEvtListenerOpts ): typeof self 
+    {
+        if( options?.once ) return this.addEventListenerOnce( evt, listener );
         
+        const listeners = this.eventListeners[ evt ];
+
+        if( !Array.isArray( listeners ) ) return self;
+
+        listeners.push( listener );
+
+        return self;
+    }
+
+    removeEventListener<EvtName extends TxSubmitClientEvt>( evt: EvtName, listener: EvtListenerOf<EvtName> ): typeof self 
+    {
+        let listeners = this.eventListeners[evt];
+
+        if( !Array.isArray( listeners ) ) return self;
+
+        this.eventListeners[evt] = listeners.filter( fn => fn !== listener );
+        this.onceEventListeners[evt] = this.onceEventListeners[evt].filter( fn => fn !== listener );
+
+        return self;
+    }
+
+    dispatchEvent( evt: TxSubmitClientEvt, msg: TxSubmitMessage ) : boolean
+    {
+        let listeners = this.eventListeners[ evt ]
+
+        if( !listeners ) return true;
+
+        for( const cb of listeners ) cb( msg );
+
+        listeners = this.onceEventListeners[ evt ];
+        let cb: TxSubmitClientEvtListener;
+
+        while( cb = listeners.shift()! ) cb( msg );
+
+        return true;
+    }
+
+    clearListeners( evt?: TxSubmitClientEvt ) : void
+    {
+        this._clearListeners( this.eventListeners, evt );
+        this._clearListeners( this.onceEventListeners, evt );
+    }
+    private _clearListeners( listeners: TxSubmitClientEvtListeners, evt?: TxSubmitClientEvt ) : void
+    {
+        if( isTxSubClientEvtName( evt ) )
+        {
+            listeners[ evt ] = [];
+        }
+        else
+        {
+            for( const key in listeners )
+            {
+                if( listeners.hasOwnProperty(key) ) 
+                {
+                    listeners[key as TxSubmitClientEvt] = [];
+                }
+            }
+        }
+    }
+    
+    // tx-submission client messages
+
+    replyTxs( askedIdsHashes: MempoolTxHash[] ): Promise< TxSubmitReplyTxs >
+    {
+        const self = this;
+
+        return new Promise(( resolve ) => {
+            var response: Uint8Array[] = [];
+
+            function resolveReplyTxs( msg: TxSubmitReplyTxs )
+            {
+                self.removeEventListener( "requestIds", resolveReplyTxs );
+
+                self.mempool.getTxs( askedIdsHashes ).then(( mempoolTxs ) => {
+                    response = mempoolTxs.map(( memTx ) => ( new Uint8Array( memTx.hash ) )) as Uint8Array[];
+
+                    resolve( msg );
+                });
+            }
+
+            this.on( "requestTxs", resolveReplyTxs );
+            
+            this.multiplexer.send(
+                new TxSubmitReplyTxs({ txs: response }).toCbor().toBuffer(),
+                { 
+                    hasAgency: true, 
+                    protocol: MiniProtocol.TxSubmission 
+                }
+            );
+        });
+    }
+
+    replyIds( oldIds: ITxIdAndSize[], reqCbor: CborObj ): Promise< TxSubmitReplyIds | TxSubmitDone >
+    {
+        const self = this;
+        const req = TxSubmitRequestIds.fromCbor( reqCbor.toString() );
+
+        return new Promise(( resolve ) => {            
+            var response: ITxIdAndSize[] = oldIds;
+            var done: boolean = false;
+            
+            async function resolveReplyIdsBlocking( msg: TxSubmitReplyIds )
+            {
+                var numberOfTryings = 2;    // it will try 2 times
+                var txCount;
+
+                for( let i = 0; i < numberOfTryings; i++ )
+                {
+                    txCount = await self.mempool.getTxCount();
+                    
+                    if( txCount > 0 ) 
+                    {
+                        resolveReplyIdsNotBlocking( msg );
+                        return;
+                    }
+
+                    setTimeout( () => {}, 10000);   // it waits 10 seconds
+                }
+
+                done = true;
+                self.removeEventListener( "requestIds", resolveReplyIdsBlocking );
+                resolve( msg );
+            }
+
+            async function resolveReplyIdsNotBlocking( msg: TxSubmitReplyIds )
+            {
+                //TODO: atm it doesnt check duplicates!!!
+                await self.mempool.getTxHashesAndSizes().then(( hashesAndSizes ) => {
+                    response = response.concat( 
+                        hashesAndSizes.map( 
+                            ( { hash, size }: TxHashAndSize ) => { 
+                                return { 
+                                    txId: new Uint8Array( hash.buffer ), 
+                                    txSize: size 
+                                };
+                            }
+                        )
+                    ) as ITxIdAndSize[];
+                });
+
+                self.removeEventListener( "requestIds", resolveReplyIdsBlocking );
+                resolve( msg );
+            }
+
+            function reply( done: boolean )
+            {
+                return done ? 
+                    new TxSubmitDone().toCbor().toBuffer()
+                :
+                    new TxSubmitReplyIds({ response }).toCbor().toBuffer();
+            }
+
+            this.on( "requestIds", req.blocking ? resolveReplyIdsBlocking : resolveReplyIdsNotBlocking );
+
+            self.multiplexer.send( 
+                reply( done ),
+                { 
+                    hasAgency: true, 
+                    protocol: MiniProtocol.TxSubmission 
+                }
+            );
+        });
+    }
 }
