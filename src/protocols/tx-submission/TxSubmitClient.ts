@@ -74,14 +74,8 @@ export class TxSubmitClient
     {
         return this._onceEventListeners;
     }
-    
-    addListener:         <EvtName extends TxSubmitClientEvt>( evt: EvtName, listener: EvtListenerOf<EvtName> ) => this
-    on:                  <EvtName extends TxSubmitClientEvt>( evt: EvtName, listener: EvtListenerOf<EvtName> ) => this
+
     once:                <EvtName extends TxSubmitClientEvt>( evt: EvtName, listener: EvtListenerOf<EvtName> ) => this
-    removeListener:      <EvtName extends TxSubmitClientEvt>( evt: EvtName, listener: EvtListenerOf<EvtName> ) => this
-    off:                 <EvtName extends TxSubmitClientEvt>( evt: EvtName, listener: EvtListenerOf<EvtName> ) => this
-    removeAllListeners:  ( event?: TxSubmitClientEvt ) => this
-    emit:                <EvtName extends TxSubmitClientEvt>( evt: EvtName, msg: MsgOf<EvtName> ) => boolean
 
     constructor( thisMultiplexer: Multiplexer ) 
     { 
@@ -190,6 +184,19 @@ export class TxSubmitClient
 
         return self;
     }
+    addListener( evt: TxSubmitClientEvt, callback: ( data: any ) => void ): this
+    {
+        return this.on( evt, callback );
+    }
+    on( evt: TxSubmitClientEvt, callback: ( data: any ) => void ): this
+    {
+        const listeners = this.eventListeners[ evt ];
+        if( !listeners ) return this;
+
+        listeners.push( callback );
+        
+        return this;
+    }
 
     removeEventListener<EvtName extends TxSubmitClientEvt>( evt: EvtName, listener: EvtListenerOf<EvtName> ): typeof self 
     {
@@ -202,7 +209,27 @@ export class TxSubmitClient
 
         return self;
     }
+    removeListener( evt: TxSubmitClientEvt, callback: ( data: any ) => void )
+    {
+        return this.off( evt, callback );
+    }
+    off( evt: TxSubmitClientEvt, callback: ( data: any ) => void )
+    {
+        const listeners = this.eventListeners[ evt ];
+        if( !listeners ) return this;
 
+        const idx = listeners.findIndex(( cb ) => callback === cb );
+        if( idx < 0 ) return this;
+
+        void listeners.splice( idx, 1 );
+
+        return this;
+    }
+
+    emit<EvtName extends TxSubmitClientEvt>( evt: EvtName, msg: MsgOf<EvtName> ): boolean
+    {
+        return this.dispatchEvent( evt, msg );
+    }
     dispatchEvent( evt: TxSubmitClientEvt, msg: TxSubmitMessage ) : boolean
     {
         let listeners = this.eventListeners[ evt ]
@@ -219,6 +246,10 @@ export class TxSubmitClient
         return true;
     }
 
+    removeAllListeners( event?: TxSubmitClientEvt ): this
+    {
+        return this.clearListeners( event );
+    }
     clearListeners( evt?: TxSubmitClientEvt ) : void
     {
         this._clearListeners( this.eventListeners, evt );
