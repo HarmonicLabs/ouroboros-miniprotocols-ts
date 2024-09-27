@@ -246,7 +246,7 @@ export class TxSubmitClient
         return true;
     }
 
-    removeAllListeners( event?: TxSubmitClientEvt ): this
+    removeAllListeners( event?: TxSubmitClientEvt ): void
     {
         return this.clearListeners( event );
     }
