@@ -20,7 +20,7 @@ type TxSubmitServerEvtListeners = {
 type TxSubmitServerEvtListener = ( msg: TxSubmitMessage ) => void;
 
 type MsgOf<EvtName extends TxSubmitServerEvt> =
-    EvtName extends "done"              ? TxSubmitInit      :
+    EvtName extends "init"              ? TxSubmitInit      :
     EvtName extends "replyIds"          ? TxSubmitReplyIds  :
     EvtName extends "replyTxs"          ? TxSubmitReplyTxs  :
     EvtName extends "done"              ? TxSubmitDone      : 
@@ -28,10 +28,10 @@ type MsgOf<EvtName extends TxSubmitServerEvt> =
 
 function msgToName( msg: TxSubmitMessage ): TxSubmitServerEvt | undefined 
 {
-    if( msg instanceof TxSubmitInit )       return "done";
-    if( msg instanceof TxSubmitReplyIds )   return "replyIds";
-    if( msg instanceof TxSubmitReplyTxs )   return "replyTxs";
-    if( msg instanceof TxSubmitDone )       return "done";
+    if( msg instanceof TxSubmitInit )       return "init"       ;
+    if( msg instanceof TxSubmitReplyIds )   return "replyIds"   ;
+    if( msg instanceof TxSubmitReplyTxs )   return "replyTxs"   ;
+    if( msg instanceof TxSubmitDone )       return "done"       ;
 
     return undefined;
 }
