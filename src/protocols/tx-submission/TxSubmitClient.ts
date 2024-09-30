@@ -83,16 +83,16 @@ export class TxSubmitClient
         this._multiplexer = thisMultiplexer;
         this._mempool = thisMempool;
 
-        let prevBytes: Uint8Array | undefined = undefined;
+        var prevBytes: Uint8Array | undefined = undefined;
         const queque: TxSubmitMessage[] = [];
 
         this.multiplexer.on( MiniProtocol.TxSubmission, ( chunk ) => {
             if( !this.hasEventListeners() ) return;
     
-            let offset: number = -1;
-            let thing: { parsed: CborObj, offset: number };
+            var offset: number = -1;
+            var thing: { parsed: CborObj, offset: number };
     
-            let msg: TxSubmitMessage;
+            var msg: TxSubmitMessage;
     
             if( prevBytes ) 
             {
@@ -133,7 +133,7 @@ export class TxSubmitClient
                 }
             }
     
-            let msgStr: TxSubmitClientEvt;
+            var msgStr: TxSubmitClientEvt;
     
             while( msg = queque.pop()! ) 
             {
@@ -212,7 +212,7 @@ export class TxSubmitClient
 
     removeEventListener<EvtName extends TxSubmitClientEvt>( evt: EvtName, listener: EvtListenerOf<EvtName> ): typeof self 
     {
-        let listeners = this.eventListeners[evt];
+        var listeners = this.eventListeners[evt];
 
         if( !Array.isArray( listeners ) ) return self;
 
@@ -244,14 +244,14 @@ export class TxSubmitClient
     }
     dispatchEvent( evt: TxSubmitClientEvt, msg: TxSubmitMessage ) : boolean
     {
-        let listeners = this.eventListeners[ evt ]
+        var listeners = this.eventListeners[ evt ]
 
         if( !listeners ) return true;
 
         for( const cb of listeners ) cb( msg );
 
         listeners = this.onceEventListeners[ evt ];
-        let cb: TxSubmitClientEvtListener;
+        var cb: TxSubmitClientEvtListener;
 
         while( cb = listeners.shift()! ) cb( msg );
 
@@ -308,7 +308,7 @@ export class TxSubmitClient
 
         var txCount;
 
-        for( let i = 0; i < numberOfTryings; i++ )
+        for( var i = 0; i < numberOfTryings; i++ )
         {
             txCount = await this.mempool.getTxCount();
             
