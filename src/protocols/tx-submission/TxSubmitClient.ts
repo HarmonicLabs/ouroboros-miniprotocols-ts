@@ -1,13 +1,13 @@
+import { ITxIdAndSize, TxSubmitDone, TxSubmitReplyIds, TxSubmitReplyTxs } from "./messages";
 import { TxSubmitMessage, txSubmitMessageFromCborObj } from "./TxSubmitMessage";
 import { AddEvtListenerOpts } from "../../common/AddEvtListenerOpts";
 import { TxSubmitRequestTxs } from "./messages/TxSubmitRequestTxs";
 import { TxSubmitRequestIds } from "./messages/TxSubmitRequestIds";
-import { ITxIdAndSize, TxSubmitDone, TxSubmitReplyIds, TxSubmitReplyTxs } from "./messages";
-import { Multiplexer } from "../../multiplexer/Multiplexer";
 import { Cbor, CborArray, CborObj } from "@harmoniclabs/cbor";
-import { MiniProtocol } from "../../MiniProtocol";
+import { Multiplexer } from "../../multiplexer/Multiplexer";
 import { IMempool, TxHashAndSize } from "./interfaces";
 import { MempoolTxHash } from "./interfaces/types";
+import { MiniProtocol } from "../../MiniProtocol";
 
 type TxSubmitClientEvt = keyof TxSubmitClientEvtListeners & string;
 
@@ -75,11 +75,13 @@ export class TxSubmitClient
         return this._onceEventListeners;
     }
 
-    once:                <EvtName extends TxSubmitClientEvt>( evt: EvtName, listener: EvtListenerOf<EvtName> ) => this
-
-    constructor( thisMultiplexer: Multiplexer ) 
+    constructor( 
+        thisMultiplexer: Multiplexer, 
+        thisMempool: IMempool 
+    ) 
     { 
         this._multiplexer = thisMultiplexer;
+        this._mempool = thisMempool;
 
         let prevBytes: Uint8Array | undefined = undefined;
         const queque: TxSubmitMessage[] = [];
@@ -147,6 +149,12 @@ export class TxSubmitClient
                 }
             }
         });
+
+        this.on( "requestTxs", ( msg ) => this.replyTxs( msg.ids ) );
+        this.on( "requestIds", ( msg ) => msg.blocking ? 
+            this.replyIdsBlocking( msg.knownTxCount, msg.requestedTxCount ) : 
+            this.replyIdsNotBlocking( msg.knownTxCount, msg.requestedTxCount )
+        );
     }
 
     hasEventListeners(): boolean 
@@ -170,6 +178,10 @@ export class TxSubmitClient
         listeners.push( listener );
 
         return self;
+    }
+    once<EvtName extends TxSubmitClientEvt>( evt: EvtName, listener: EvtListenerOf<EvtName> ): typeof self 
+    {
+        return this.addEventListenerOnce( evt, listener );
     }
 
     addEventListener<EvtName extends TxSubmitClientEvt>( evt: EvtName, listener: EvtListenerOf<EvtName>, options?: AddEvtListenerOpts ): typeof self 
@@ -275,105 +287,70 @@ export class TxSubmitClient
     
     // tx-submission client messages
 
-    replyTxs( askedIdsHashes: MempoolTxHash[] ): Promise< TxSubmitReplyTxs >
+    async replyTxs( askedIdsHashes: MempoolTxHash[] ): Promise<void>
     {
-        const self = this;
-
-        return new Promise(( resolve ) => {
-            var response: Uint8Array[] = [];
-
-            function resolveReplyTxs( msg: TxSubmitReplyTxs )
-            {
-                self.removeEventListener( "requestIds", resolveReplyTxs );
-
-                self.mempool.getTxs( askedIdsHashes ).then(( mempoolTxs ) => {
-                    response = mempoolTxs.map(( memTx ) => ( new Uint8Array( memTx.hash ) )) as Uint8Array[];
-
-                    resolve( msg );
-                });
+        const mempoolTxs = await this.mempool.getTxs( askedIdsHashes );
+        const response = mempoolTxs.map(( memTx ) => ( new Uint8Array( memTx.hash ) )) as Uint8Array[];
+        
+        this.multiplexer.send(
+            new TxSubmitReplyTxs({ txs: response }).toCbor().toBuffer(),
+            { 
+                hasAgency: true, 
+                protocol: MiniProtocol.TxSubmission 
             }
-
-            this.on( "requestTxs", resolveReplyTxs );
-            
-            this.multiplexer.send(
-                new TxSubmitReplyTxs({ txs: response }).toCbor().toBuffer(),
-                { 
-                    hasAgency: true, 
-                    protocol: MiniProtocol.TxSubmission 
-                }
-            );
-        });
+        );
     }
 
-    replyIds( oldIds: ITxIdAndSize[], reqCbor: CborObj ): Promise< TxSubmitReplyIds | TxSubmitDone >
+    async replyIdsBlocking( knownTxCount: number, requestedTxCount: number ): Promise< void >
     {
-        const self = this;
-        const req = TxSubmitRequestIds.fromCbor( reqCbor.toString() );
+        const numberOfTryings = 2;          // number of tryings
+        const timeBetweenTryings = 10;      // time in seconds
 
-        return new Promise(( resolve ) => {            
-            var response: ITxIdAndSize[] = oldIds;
-            var done: boolean = false;
+        var txCount;
+
+        for( let i = 0; i < numberOfTryings; i++ )
+        {
+            txCount = await this.mempool.getTxCount();
             
-            async function resolveReplyIdsBlocking( msg: TxSubmitReplyIds )
+            if( txCount > 0 ) 
             {
-                var numberOfTryings = 2;    // it will try 2 times
-                var txCount;
-
-                for( let i = 0; i < numberOfTryings; i++ )
-                {
-                    txCount = await self.mempool.getTxCount();
-                    
-                    if( txCount > 0 ) 
-                    {
-                        resolveReplyIdsNotBlocking( msg );
-                        return;
-                    }
-
-                    setTimeout( () => {}, 10000);   // it waits 10 seconds
-                }
-
-                done = true;
-                self.removeEventListener( "requestIds", resolveReplyIdsBlocking );
-                resolve( msg );
+                this.replyIdsNotBlocking( knownTxCount, requestedTxCount );
+                return Promise.resolve();
             }
 
-            async function resolveReplyIdsNotBlocking( msg: TxSubmitReplyIds )
-            {
-                //TODO: atm it doesnt check duplicates!!!
-                await self.mempool.getTxHashesAndSizes().then(( hashesAndSizes ) => {
-                    response = response.concat( 
-                        hashesAndSizes.map( 
-                            ( { hash, size }: TxHashAndSize ) => { 
-                                return { 
-                                    txId: new Uint8Array( hash.buffer ), 
-                                    txSize: size 
-                                };
-                            }
-                        )
-                    ) as ITxIdAndSize[];
-                });
+            setTimeout( () => {}, timeBetweenTryings * 1000 );
+        }
 
-                self.removeEventListener( "requestIds", resolveReplyIdsBlocking );
-                resolve( msg );
+        this.multiplexer.send( 
+            new TxSubmitDone().toCbor().toBuffer(),
+            { 
+                hasAgency: true, 
+                protocol: MiniProtocol.TxSubmission 
             }
+        );
+    }
 
-            function reply( done: boolean )
-            {
-                return done ? 
-                    new TxSubmitDone().toCbor().toBuffer()
-                :
-                    new TxSubmitReplyIds({ response }).toCbor().toBuffer();
+    async replyIdsNotBlocking( knownTxCount: number, requestedTxCount: number ): Promise< void >
+    {
+        const hashesAndSizes = await this.mempool.getTxHashesAndSizes();
+        
+        const response = hashesAndSizes.map( 
+            ( { hash, size }: TxHashAndSize ) => { 
+                return { 
+                    txId: new Uint8Array( hash.buffer ), 
+                    txSize: size 
+                };
             }
+        ) as ITxIdAndSize[];
 
-            this.on( "requestIds", req.blocking ? resolveReplyIdsBlocking : resolveReplyIdsNotBlocking );
+        const filteredResponse = response.slice( knownTxCount, knownTxCount + requestedTxCount );
 
-            self.multiplexer.send( 
-                reply( done ),
-                { 
-                    hasAgency: true, 
-                    protocol: MiniProtocol.TxSubmission 
-                }
-            );
-        });
+        this.multiplexer.send( 
+            new TxSubmitReplyIds({ response: filteredResponse }).toCbor().toBuffer(),
+            { 
+                hasAgency: true, 
+                protocol: MiniProtocol.TxSubmission 
+            }
+        );
     }
 }
