@@ -1,279 +1,93 @@
+import { BlockFetchMessage, blockFetchMessageFromCborObj } from "./BlockFetchMessage";
+import { BlockFetchRequestRange } from "./messages/BlockFetchRequestRange";
+import { BlockFetchClientDone } from "./messages/BlockFetchClientDone";
+import { AddEvtListenerOpts } from "../../common/AddEvtListenerOpts";
+import { BlockFetchBatchDone } from "./messages/BlockFetchBatchDone";
+import { BlockFetchNoBlocks } from "./messages/BlockFetchNoBlocks";
+import { IChainPoint, isOriginPoint } from "../types/ChainPoint";
+import { BlockFetchBlock } from "./messages/BlockFetchBlock";
+import { toHex } from "@harmoniclabs/uint8array-utils";
 import { Cbor, CborObj } from "@harmoniclabs/cbor";
 import { MiniProtocol } from "../../MiniProtocol";
 import { Multiplexer } from "../../multiplexer";
-import { ChainPoint, IChainPoint, isOriginPoint } from "../types/ChainPoint";
-import { BlockFetchBatchDone } from "./messages/BlockFetchBatchDone";
-import { BlockFetchClientDone } from "./messages/BlockFetchClientDone";
-import { BlockFetchMessage, blockFetchMessageFromCborObj, isBlockFetchMessage } from "./BlockFetchMessage";
-import { BlockFetchNoBlocks } from "./messages/BlockFetchNoBlocks";
-import { BlockFetchRequestRange } from "./messages/BlockFetchRequestRange";
-import { BlockFetchStartBatch } from "./messages/BlockFetchStartBatch";
-import { BlockFetchBlock } from "./messages/BlockFetchBlock";
-import { AddEvtListenerOpts } from "../../common/AddEvtListenerOpts";
-import { toHex } from "@harmoniclabs/uint8array-utils";
 
-const roDescr = {
-    writable: false,
-    enumerable: true,
-    configurable: false
+type BlockFetchClientEvt = keyof BlockFetchClientEvtListeners & string;
+
+type BlockFetchClientEvtListeners = {
+    noBlocks:   BlockFetchClientEvtListener[],
+    batchDone:  BlockFetchClientEvtListener[],
+    // error:      ( err: Error ) => void
 };
 
-type AnyBlockFetchClientEvtNameListener = ( msg: BlockFetchMessage ) => void;
+type BlockFetchClientEvtListener = ( msg: BlockFetchMessage ) => void;
 
-type BlockFetchClientEvtNameListeners = {
-    requestRange: AnyBlockFetchClientEvtNameListener[]
-    noBlocks: AnyBlockFetchClientEvtNameListener[]
-    startBatch: AnyBlockFetchClientEvtNameListener[]
-    batchDone: AnyBlockFetchClientEvtNameListener[]
-    clientDone: AnyBlockFetchClientEvtNameListener[]
-    block: AnyBlockFetchClientEvtNameListener[],
-    error: (( err: Error ) => void)[]
-};
+type MsgOf<EvtName extends BlockFetchClientEvt> =
+    EvtName extends "noBlocks"      ? BlockFetchNoBlocks    :
+    EvtName extends "batchDone"     ? BlockFetchBatchDone   :
+    never                                                   ;
 
-type BlockFetchClientEvtName = keyof BlockFetchClientEvtNameListeners;
-
-function isAnyBlockFetchClientEvtName( evt: any ): evt is BlockFetchClientEvtName
+function msgToName( msg: BlockFetchMessage ): BlockFetchClientEvt | undefined 
 {
-    return typeof evt === "string" && (
-        evt === "requestRange" ||
-        evt === "noBlocks" ||
-        evt === "startBatch" ||
-        evt === "batchDone" ||
-        evt === "clientDone" ||
-        evt === "block" ||
-        evt === "error"
-    );
-}
-
-function msgToName( msg: BlockFetchMessage | Error ): BlockFetchClientEvtName | undefined
-{
-    if( msg instanceof BlockFetchRequestRange ) return "requestRange";
-    if( msg instanceof BlockFetchNoBlocks ) return "noBlocks";
-    if( msg instanceof BlockFetchBlock ) return "block";
-    if( msg instanceof BlockFetchStartBatch ) return "startBatch";
-    if( msg instanceof BlockFetchBatchDone ) return "batchDone";
-    if( msg instanceof BlockFetchClientDone ) return "clientDone";
-    if( msg instanceof Error ) return "error";
+    if( msg instanceof BlockFetchNoBlocks   )       return "noBlocks";
+    if( msg instanceof BlockFetchBatchDone  )       return "batchDone";
 
     return undefined;
 }
 
-type MsgOf<Evt extends BlockFetchClientEvtName> =
-    Evt extends "requestRange" ? BlockFetchRequestRange :
-    Evt extends "noBlocks" ? BlockFetchNoBlocks :
-    Evt extends "startBatch" ? BlockFetchStartBatch :
-    Evt extends "batchDone" ? BlockFetchBatchDone :
-    Evt extends "clientDone" ? BlockFetchClientDone :
-    Evt extends "block" ? BlockFetchBlock :
-    Evt extends "error" ? Error :
-    never;
+function isTxSubClientEvtName( stuff: any ): stuff is BlockFetchClientEvt
+{
+    return (
+        stuff === "noBlocks"            ||
+        stuff === "batchDone"
+    );
+}
 
-type EvtListenerOf<Evt extends BlockFetchClientEvtName> = ( msg: MsgOf<Evt> ) => void
+export type BlockFetchResult = { ok: true, msg: undefined } | { ok: false, msg: bigint }
+
+type EvtListenerOf<Evt extends BlockFetchClientEvt> = ( ...args: any[] ) => any
 
 export class BlockFetchClient
 {
-    readonly mplexer: Multiplexer;
-
-    clearListeners!: () => void;
-
-    addEventListener:    <EvtName extends BlockFetchClientEvtName>( evt: EvtName, listener: EvtListenerOf<EvtName>, options?: AddEvtListenerOpts ) => this
-    addListener:         <EvtName extends BlockFetchClientEvtName>( evt: EvtName, listener: EvtListenerOf<EvtName> ) => this
-    on:                  <EvtName extends BlockFetchClientEvtName>( evt: EvtName, listener: EvtListenerOf<EvtName> ) => this
-    once:                <EvtName extends BlockFetchClientEvtName>( evt: EvtName, listener: EvtListenerOf<EvtName> ) => this
-    removeEventListener: <EvtName extends BlockFetchClientEvtName>( evt: EvtName, listener: EvtListenerOf<EvtName> ) => this
-    removeListener:      <EvtName extends BlockFetchClientEvtName>( evt: EvtName, listener: EvtListenerOf<EvtName> ) => this
-    off:                 <EvtName extends BlockFetchClientEvtName>( evt: EvtName, listener: EvtListenerOf<EvtName> ) => this
-    removeAllListeners:  ( event   ?: BlockFetchClientEvtName ) => this
-    emit:                <EvtName extends BlockFetchClientEvtName>( evt: EvtName, msg: MsgOf<EvtName> ) => boolean
-    dispatchEvent:       <EvtName extends BlockFetchClientEvtName>( evt: EvtName, msg: MsgOf<EvtName> ) => boolean
-    
-    constructor( multiplexer: Multiplexer )
+    readonly _multiplexer: Multiplexer;
+    get multiplexer(): Multiplexer 
     {
-        const self =  this;
+        return this._multiplexer;
+    }
 
-        const eventListeners: BlockFetchClientEvtNameListeners = {
-            requestRange: [],
-            noBlocks: [],
-            startBatch: [],
-            batchDone: [],
-            clientDone: [],
-            block: [],
-            error: []
-        };
-        const onceEventListeners: BlockFetchClientEvtNameListeners = {
-            requestRange: [],
-            noBlocks: [],
-            startBatch: [],
-            batchDone: [],
-            clientDone: [],
-            block: [],
-            error: []
-        };
+    private _eventListeners: BlockFetchClientEvtListeners = Object.freeze({
+        noBlocks:       [],
+        batchDone:      [],
+        // error:          ( err: Error ) => {}
+    });
+    get eventListeners(): BlockFetchClientEvtListeners 
+    {
+        return this._eventListeners;
+    }
 
-        function clearListeners( evt?: BlockFetchClientEvtName ): typeof self
-        {
-            if( isAnyBlockFetchClientEvtName( evt ) )
-            {
-                eventListeners[evt].length = 0;
-                onceEventListeners[evt].length = 0;
-                return self;
-            }
-            eventListeners.requestRange.length      = 0;
-            eventListeners.noBlocks.length          = 0;
-            eventListeners.startBatch.length        = 0;
-            eventListeners.batchDone.length         = 0;
-            eventListeners.clientDone.length        = 0;
-            eventListeners.block.length             = 0;
-            eventListeners.error.length             = 0;
-
-            onceEventListeners.requestRange.length      = 0;
-            onceEventListeners.noBlocks.length          = 0;
-            onceEventListeners.startBatch.length        = 0;
-            onceEventListeners.batchDone.length         = 0;
-            onceEventListeners.clientDone.length        = 0;
-            onceEventListeners.block.length             = 0;
-            onceEventListeners.error.length             = 0;
-
-            return self;
-        }
-
-        function hasEventListeners( includeError: boolean = false ): boolean
-        {
-            return  (
-                includeError ? (
-                    eventListeners.error.length             > 0 ||
-                    onceEventListeners.error.length         > 0
-                ) : true
-            ) && (
-                eventListeners.requestRange.length     > 0 ||
-                eventListeners.noBlocks.length       > 0 ||
-                eventListeners.startBatch.length    > 0 ||
-                eventListeners.batchDone.length > 0 ||
-                eventListeners.clientDone.length        > 0 ||
-                eventListeners.block.length        > 0 ||
-
-                onceEventListeners.requestRange.length     > 0 ||
-                onceEventListeners.noBlocks.length       > 0 ||
-                onceEventListeners.startBatch.length    > 0 ||
-                onceEventListeners.batchDone.length > 0 ||
-                onceEventListeners.clientDone.length > 0 ||
-                onceEventListeners.block.length        > 0
-            );
-        }
-
-        /** @deprecated */
-        function onRequestRange( cb: ( msg: BlockFetchRequestRange ) => void ): void
-        {
-            eventListeners.requestRange.push( cb );
-        }
-        /** @deprecated */
-        function onNoBlocks( cb: ( msg: BlockFetchNoBlocks ) => void ): void
-        {
-            eventListeners.noBlocks.push( cb );
-        }
-        /** @deprecated */
-        function onBlock( cb: ( msg: BlockFetchBlock ) => void ): void
-        {
-            eventListeners.block.push( cb );
-        }
-        /** @deprecated */
-        function onStartBatch( cb: ( msg: BlockFetchStartBatch ) => void ): void
-        {
-            eventListeners.startBatch.push( cb );
-        }
-        /** @deprecated */
-        function onBatchDone( cb: ( msg: BlockFetchBatchDone ) => void ): void
-        {
-            eventListeners.batchDone.push( cb );
-        }
-        /** @deprecated */
-        function onClientDone( cb: ( msg: BlockFetchClientDone ) => void ): void
-        {
-            eventListeners.clientDone.push( cb );
-        }
-
-        function addEventListenerOnce( evt: BlockFetchClientEvtName, listener: AnyBlockFetchClientEvtNameListener ): typeof self
-        {
-            if( !isAnyBlockFetchClientEvtName( evt ) ) return self;
-
-            onceEventListeners[ evt ].push( listener as any );
-            return self;
-        }
-        function addEventListener( evt: BlockFetchClientEvtName, listener: AnyBlockFetchClientEvtNameListener, opts?: AddEvtListenerOpts ): typeof self
-        {
-            if( opts?.once === true ) return addEventListenerOnce( evt, listener );
-            
-            if( !isAnyBlockFetchClientEvtName( evt ) ) return self;
-            
-            eventListeners[ evt ].push( listener as any );
-            return self;
-        }
-        function removeEventListener( evt: BlockFetchClientEvtName, listener: AnyBlockFetchClientEvtNameListener ): typeof self
-        {
-            if( !isAnyBlockFetchClientEvtName( evt ) ) return self;
-
-            eventListeners[evt] = eventListeners[evt].filter( fn => fn !== listener ) as any;
-            onceEventListeners[evt] = onceEventListeners[evt].filter( fn => fn !== listener ) as any;
-            return self; 
-        }
-        function dispatchEvent( evt: BlockFetchClientEvtName, msg: BlockFetchMessage | Error ): boolean
-        {
-            if( !isAnyBlockFetchClientEvtName( evt ) ) return true;
-            if( evt !== "error" && !isBlockFetchMessage( msg ) ) return true;
-
-            const listeners = eventListeners[ evt ];
-            const nListeners = listeners.length;
-            for(let i = 0; i < nListeners; i++)
-            {
-                listeners[i](msg as any);
-            }
-
-            const onceListeners = onceEventListeners[evt];
-            while( onceListeners.length > 0 )
-            {
-                onceListeners.shift()!(msg as any);
-            }
-
-            return true;
-        }
-
-        Object.defineProperties(
-            this, {
-                mplexer:                { value: multiplexer, ...roDescr },
-                clearListeners:         { value: clearListeners, ...roDescr },
-                removeAllListeners:     { value: clearListeners, ...roDescr },
-                onRequestRange:         { value: onRequestRange, ...roDescr },
-                onNoBlocks:             { value: onNoBlocks, ...roDescr },
-                onBlock:                { value: onBlock, ...roDescr },
-                onStartBatch:           { value: onStartBatch, ...roDescr },
-                onBatchDone:            { value: onBatchDone, ...roDescr },
-                onClientDone:           { value: onClientDone, ...roDescr },
-                addEventListener:       { value: addEventListener, ...roDescr },
-                addListener:            { value: addEventListener, ...roDescr },
-                on:                     { value: addEventListener, ...roDescr },
-                once:                   { value: addEventListenerOnce, ...roDescr },
-                removeEventListener:    { value: removeEventListener, ...roDescr },
-                removeListener:         { value: removeEventListener, ...roDescr },
-                off:                    { value: removeEventListener, ...roDescr },
-                dispatchEvent:          { value: dispatchEvent, ...roDescr },
-                emit:                   { value: dispatchEvent, ...roDescr },
-            }
-        );
+    private _onceEventListeners: BlockFetchClientEvtListeners = Object.freeze({
+        noBlocks:       [],
+        batchDone:      [],
+        // error:          ( err: Error ) => {}
+    });
+    get onceEventListeners(): BlockFetchClientEvtListeners 
+    {
+        return this._onceEventListeners;
+    }
+    
+    constructor( thisMultiplexer: Multiplexer )
+    {
+        this._multiplexer = thisMultiplexer;
 
         let prevBytes: Uint8Array | undefined = undefined;
         const queque: BlockFetchMessage[] = [];
 
-        multiplexer.on( MiniProtocol.BlockFetch ,chunk => {
-
-            if( !hasEventListeners() ) return;
+        this.multiplexer.on( MiniProtocol.BlockFetch, ( chunk ) => {
+            if( !this.hasEventListeners() ) return;
 
             let offset: number = -1;
             let thing: { parsed: CborObj, offset: number };
 
             let msg: BlockFetchMessage;
-
-            // const dbg_chunk = Uint8Array.prototype.slice.call( chunk );
-            // const dbg_prev = prevBytes ? Uint8Array.prototype.slice.call( prevBytes ) : prevBytes;
 
             if( prevBytes )
             {
@@ -288,6 +102,7 @@ export class BlockFetchClient
             {
                 const originalSTLimit = Error.stackTraceLimit;
                 Error.stackTraceLimit = 0;
+
                 try {
                     thing = Cbor.parseWithOffset( chunk );
                 }
@@ -312,7 +127,7 @@ export class BlockFetchClient
 
                     queque.unshift( msg );
                 }
-                catch (e)
+                catch( e )
                 {
                     // before dispatch event
                     Error.stackTraceLimit = originalSTLimit;
@@ -322,11 +137,11 @@ export class BlockFetchClient
                     // console.error( "dbg_prev", dbg_prev ? toHex( dbg_prev ) : dbg_prev );
                     // console.error("-------------------------------------------------------");
                     const err = new Error(
-                        (typeof e?.message === "string" ? e.message : "") +
+                        ( typeof e?.message === "string" ? e.message : "" ) +
                         "\ndata: " + toHex( chunk ) + "\n"
                     );
                     
-                    dispatchEvent("error", err );
+                    // this.dispatchEvent( "error", err );
                 }
                 finally {
                     Error.stackTraceLimit = originalSTLimit;
@@ -342,30 +157,149 @@ export class BlockFetchClient
                 }
             }
 
-            let msgStr: BlockFetchClientEvtName;
+            let msgStr: BlockFetchClientEvt;
             while( msg = queque.pop()! )
             {
                 msgStr = msgToName( msg )!;
-                if( !msgStr ) continue; // ingore messages not expected by the client
 
-                dispatchEvent( msgStr, msg );
+                // ingore messages not expected by the client
+                if( !msgStr ) continue; 
+
+                this.dispatchEvent( msgStr, msg );
             }
 
         });
     }
 
-    /** @deprecated */
-    onRequestRange!:    ( cb: ( msg: BlockFetchRequestRange ) => void ) => void
-    /** @deprecated */
-    onNoBlocks!:        ( cb: ( msg: BlockFetchNoBlocks     ) => void ) => void
-    /** @deprecated */
-    onBlock!:           ( cb: ( msg: BlockFetchBlock        ) => void ) => void
-    /** @deprecated */
-    onStartBatch!:      ( cb: ( msg: BlockFetchStartBatch   ) => void ) => void
-    /** @deprecated */
-    onBatchDone!:       ( cb: ( msg: BlockFetchBatchDone    ) => void ) => void
-    /** @deprecated */
-    onClientDone!:      ( cb: ( msg: BlockFetchClientDone   ) => void ) => void
+    hasEventListeners(): boolean 
+    {
+        return this._hasEventListeners( this.eventListeners ) || this._hasEventListeners( this.onceEventListeners );
+    }
+    private _hasEventListeners( listeners: BlockFetchClientEvtListeners ): boolean 
+    {
+        return (
+            listeners.noBlocks.length   > 0       ||
+            listeners.batchDone.length  > 0
+        );
+    }
+
+    addEventListenerOnce<EvtName extends BlockFetchClientEvt>( evt: EvtName, listener: EvtListenerOf<EvtName> ) : typeof self 
+    {
+        const listeners = this.onceEventListeners[ evt ];
+
+        if( !Array.isArray( listeners ) ) return self;
+
+        listeners.push( listener );
+
+        return self;
+    }
+    once<EvtName extends BlockFetchClientEvt>( evt: EvtName, listener: EvtListenerOf<EvtName> ): typeof self 
+    {
+        return this.addEventListenerOnce( evt, listener );
+    }
+
+    addEventListener<EvtName extends BlockFetchClientEvt>( evt: EvtName, listener: EvtListenerOf<EvtName>, options?: AddEvtListenerOpts ): typeof self 
+    {
+        if( options?.once ) return this.addEventListenerOnce( evt, listener );
+        
+        const listeners = this.eventListeners[ evt ];
+
+        if( !Array.isArray( listeners ) ) return self;
+
+        listeners.push( listener );
+
+        return self;
+    }
+    addListener( evt: BlockFetchClientEvt, callback: ( data: any ) => void ): this
+    {
+        return this.on( evt, callback );
+    }
+    on( evt: BlockFetchClientEvt, callback: ( data: any ) => void ): this
+    {
+        const listeners = this.eventListeners[ evt ];
+        if( !listeners ) return this;
+
+        listeners.push( callback );
+        
+        return this;
+    }
+
+    removeEventListener<EvtName extends BlockFetchClientEvt>( evt: EvtName, listener: EvtListenerOf<EvtName> ): typeof self 
+    {
+        var listeners = this.eventListeners[evt];
+
+        if( !Array.isArray( listeners ) ) return self;
+
+        this.eventListeners[ evt ] = listeners.filter( fn => fn !== listener );
+        this.onceEventListeners[ evt ] = this.onceEventListeners[evt].filter( fn => fn !== listener );
+
+        return self;
+    }
+    removeListener( evt: BlockFetchClientEvt, callback: ( data: any ) => void )
+    {
+        return this.off( evt, callback );
+    }
+    off( evt: BlockFetchClientEvt, callback: ( data: any ) => void )
+    {
+        const listeners = this.eventListeners[ evt ];
+        if( !listeners ) return this;
+
+        const idx = listeners.findIndex(( cb ) => callback === cb );
+        if( idx < 0 ) return this;
+
+        void listeners.splice( idx, 1 );
+
+        return this;
+    }
+
+    emit<EvtName extends BlockFetchClientEvt>( evt: EvtName, msg: MsgOf<EvtName> ): boolean
+    {
+        return this.dispatchEvent( evt, msg );
+    }
+    dispatchEvent( evt: BlockFetchClientEvt, msg: BlockFetchMessage ) : boolean
+    {
+        var listeners = this.eventListeners[ evt ]
+
+        if( !listeners ) return true;
+
+        for( const cb of listeners ) cb( msg );
+
+        listeners = this.onceEventListeners[ evt ];
+        var cb: BlockFetchClientEvtListener;
+
+        while( cb = listeners.shift()! ) cb( msg );
+
+        return true;
+    }
+
+    removeAllListeners( evt?: BlockFetchClientEvt ): void
+    {
+        return this.clearListeners( evt );
+    }
+    clearListeners( evt?: BlockFetchClientEvt ) : void
+    {
+        this._clearListeners( this.eventListeners, evt );
+        this._clearListeners( this.onceEventListeners, evt );
+    }
+    private _clearListeners( listeners: BlockFetchClientEvtListeners, evt?: BlockFetchClientEvt ) : void
+    {
+        if( isTxSubClientEvtName( evt ) )
+        {
+            listeners[ evt ] = [];
+        }
+        else
+        {
+            for( const key in listeners )
+            {
+                if( listeners.hasOwnProperty( key ) ) 
+                {
+                    listeners[ key as BlockFetchClientEvt ] = [];
+                }
+            }
+        }
+    }
+
+    // block fetch client messages
 
     /** request a single block from peer */
     request( point: IChainPoint ): Promise<BlockFetchNoBlocks | BlockFetchBlock>
@@ -378,15 +312,16 @@ export class BlockFetchClient
     {
         if( isOriginPoint( from ) || isOriginPoint( to ) )
         {
-            this.dispatchEvent(
-                "error",
-                new Error(
-                    "trying to request origin point; " +
-                    "The Genesis Block exsists as a concept, but not really in a node database; " +
-                    "BlockFetchClient::requestRange will resolve with `BlockFetchNoBlocks`; " +
-                    "try with the first real block point"
-                )
-            );
+            // this.dispatchEvent(
+            //     "error",
+            //     new Error(
+            //         "trying to request origin point; " +
+            //         "The Genesis Block exsists as a concept, but not really in a node database; " +
+            //         "BlockFetchClient::requestRange will resolve with `BlockFetchNoBlocks`; " +
+            //         "try with the first real block point"
+            //     )
+            // );
+
             return Promise.resolve( new BlockFetchNoBlocks() );
         }
 
