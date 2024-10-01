@@ -1,93 +1,362 @@
-import { BlockFetchMessage, blockFetchMessageFromCborObj } from "./BlockFetchMessage";
-import { BlockFetchRequestRange } from "./messages/BlockFetchRequestRange";
-import { BlockFetchClientDone } from "./messages/BlockFetchClientDone";
+import { ChainSyncMessage, ChainSyncRollBackwards, ChainSyncRollForward, ChainSyncIntersectFound, ChainSyncIntersectNotFound, ChainSyncAwaitReply, isChainSyncMessage, chainSyncMessageFromCborObj, ChainSyncRequestNext, ChainSyncFindIntersect, ChainSyncMessageDone } from "../chain-sync";
 import { AddEvtListenerOpts } from "../../common/AddEvtListenerOpts";
-import { BlockFetchBatchDone } from "./messages/BlockFetchBatchDone";
-import { BlockFetchNoBlocks } from "./messages/BlockFetchNoBlocks";
-import { IChainPoint, isOriginPoint } from "../types/ChainPoint";
-import { BlockFetchBlock } from "./messages/BlockFetchBlock";
+import { Multiplexer } from "../../multiplexer/Multiplexer";
+import { ErrorListener } from "../../common/ErrorListener";
 import { toHex } from "@harmoniclabs/uint8array-utils";
 import { Cbor, CborObj } from "@harmoniclabs/cbor";
 import { MiniProtocol } from "../../MiniProtocol";
-import { Multiplexer } from "../../multiplexer";
+import { IChainPoint } from "../types/ChainPoint";
 
-type BlockFetchClientEvt = keyof BlockFetchClientEvtListeners & string;
+const roDescr = Object.freeze({
+    writable: false,
+    enumerable: true,
+    configurable: false
+});
 
-type BlockFetchClientEvtListeners = {
-    noBlocks:   BlockFetchClientEvtListener[],
-    batchDone:  BlockFetchClientEvtListener[],
-    // error:      ( err: Error ) => void
+type ChainSyncClientEvtListener = ( msg: ChainSyncMessage ) => void;
+type AnyChainSyncClientEvtListener = ChainSyncClientEvtListener | (( err: Error ) => void);
+
+type ChainSyncClientEvtListeners = {
+    rollBackwards: ChainSyncClientEvtListener[]
+    rollForward: ChainSyncClientEvtListener[]
+    intersectFound: ChainSyncClientEvtListener[]
+    intersectNotFound: ChainSyncClientEvtListener[]
+    awaitReply: ChainSyncClientEvtListener[],
+    error: (( err: Error ) => void)[]
 };
 
-type BlockFetchClientEvtListener = ( msg: BlockFetchMessage ) => void;
+type ChainSyncClientEvtName = keyof Omit<ChainSyncClientEvtListeners,"error">;
+type AnyChainSyncClientEvtName = ChainSyncClientEvtName | "error";
 
-type MsgOf<EvtName extends BlockFetchClientEvt> =
-    EvtName extends "noBlocks"      ? BlockFetchNoBlocks    :
-    EvtName extends "batchDone"     ? BlockFetchBatchDone   :
-    never                                                   ;
+type EvtListenerOf<EvtName extends AnyChainSyncClientEvtName> =
+    EvtName extends "rollBackwards"     ? ( msg: ChainSyncRollBackwards ) => void :
+    EvtName extends "rollForward"       ? ( msg: ChainSyncRollForward ) => void :
+    EvtName extends "intersectFound"    ? ( msg: ChainSyncIntersectFound) => void :
+    EvtName extends "intersectNotFound" ? ( msg: ChainSyncIntersectNotFound ) => void :
+    EvtName extends "awaitReply"        ? ( msg: ChainSyncAwaitReply ) => void :
+    EvtName extends "error"             ? ( err: Error ) => void :
+    never;
 
-function msgToName( msg: BlockFetchMessage ): BlockFetchClientEvt | undefined 
+type MsgOf<EvtName extends AnyChainSyncClientEvtName> =
+    EvtName extends "rollBackwards"     ? ChainSyncRollBackwards :
+    EvtName extends "rollForward"       ? ChainSyncRollForward :
+    EvtName extends "intersectFound"    ? ChainSyncIntersectFound :
+    EvtName extends "intersectNotFound" ? ChainSyncIntersectNotFound :
+    EvtName extends "awaitReply"        ? ChainSyncAwaitReply :
+    EvtName extends "error"             ? Error :
+    never;
+
+function isChainSyncClientEvtName( str: any ): str is ChainSyncClientEvtName
 {
-    if( msg instanceof BlockFetchNoBlocks   )       return "noBlocks";
-    if( msg instanceof BlockFetchBatchDone  )       return "batchDone";
+    return (
+        str === "rollBackwards" ||
+        str === "rollForward" ||
+        str === "intersectFound" ||
+        str === "intersectNotFound" ||
+        str === "awaitReply"
+    );
+}
+
+function isAnyChainSyncClientEvtName( str: any ): str is AnyChainSyncClientEvtName
+{
+    return isChainSyncClientEvtName( str ) || str === "error";
+}
+
+function msgToName( msg: ChainSyncMessage ): ChainSyncClientEvtName | undefined
+{
+    if( msg instanceof ChainSyncRollBackwards ) return "rollBackwards";
+    if( msg instanceof ChainSyncRollForward ) return "rollForward";
+    if( msg instanceof ChainSyncIntersectFound ) return "intersectFound";
+    if( msg instanceof ChainSyncIntersectNotFound ) return "intersectNotFound";
+    if( msg instanceof ChainSyncAwaitReply ) return "awaitReply";
 
     return undefined;
 }
 
-function isTxSubClientEvtName( stuff: any ): stuff is BlockFetchClientEvt
-{
-    return (
-        stuff === "noBlocks"            ||
-        stuff === "batchDone"
-    );
+export interface IChainSyncClient {
+    readonly mplexer: Multiplexer,
+
+    addEventListener( evt: "rollBackwards"        , listener: ChainSyncClientEvtListener, options?: AddEvtListenerOpts ): this
+    addEventListener( evt: "rollForward"          , listener: ChainSyncClientEvtListener, options?: AddEvtListenerOpts ): this
+    addEventListener( evt: "intersectFound"       , listener: ChainSyncClientEvtListener, options?: AddEvtListenerOpts ): this
+    addEventListener( evt: "intersectNotFound"    , listener: ChainSyncClientEvtListener, options?: AddEvtListenerOpts ): this
+    addEventListener( evt: "awaitReply"           , listener: ChainSyncClientEvtListener, options?: AddEvtListenerOpts ): this
+    addEventListener( evt: "error"                , listener: (err: Error) => void ): this
+    addEventListener( evt: AnyChainSyncClientEvtName , listener: AnyChainSyncClientEvtListener, options?: AddEvtListenerOpts ): this
+
+    addListener( evt: "rollBackwards"        , listener: ChainSyncClientEvtListener ): this
+    addListener( evt: "rollForward"          , listener: ChainSyncClientEvtListener ): this
+    addListener( evt: "intersectFound"       , listener: ChainSyncClientEvtListener ): this
+    addListener( evt: "intersectNotFound"    , listener: ChainSyncClientEvtListener ): this
+    addListener( evt: "awaitReply"           , listener: ChainSyncClientEvtListener ): this
+    addListener( evt: "error"                , listener: (err: Error) => void): this
+    addListener( evt: AnyChainSyncClientEvtName , listener: ChainSyncClientEvtListener ): this
+
+    on( evt: "rollBackwards"        , listener: ChainSyncClientEvtListener ): this
+    on( evt: "rollForward"          , listener: ChainSyncClientEvtListener ): this
+    on( evt: "intersectFound"       , listener: ChainSyncClientEvtListener ): this
+    on( evt: "intersectNotFound"    , listener: ChainSyncClientEvtListener ): this
+    on( evt: "awaitReply"           , listener: ChainSyncClientEvtListener ): this
+    on( evt: "error"                , listener: (err: Error) => void ): this
+    on( evt: ChainSyncClientEvtName , listener: ChainSyncClientEvtListener ): this
+
+    once( evt: "rollBackwards"        , listener: ChainSyncClientEvtListener ): this
+    once( evt: "rollForward"          , listener: ChainSyncClientEvtListener ): this
+    once( evt: "intersectFound"       , listener: ChainSyncClientEvtListener ): this
+    once( evt: "intersectNotFound"    , listener: ChainSyncClientEvtListener ): this
+    once( evt: "awaitReply"           , listener: ChainSyncClientEvtListener ): this
+    once( evt: "error"                , listener: (err: Error) => void ): this
+    once( evt: ChainSyncClientEvtName , listener: ChainSyncClientEvtListener ): this
+
+    removeEventListener( evt: "rollBackwards"        , listener: ChainSyncClientEvtListener ): this
+    removeEventListener( evt: "rollForward"          , listener: ChainSyncClientEvtListener ): this
+    removeEventListener( evt: "intersectFound"       , listener: ChainSyncClientEvtListener ): this
+    removeEventListener( evt: "intersectNotFound"    , listener: ChainSyncClientEvtListener ): this
+    removeEventListener( evt: "awaitReply"           , listener: ChainSyncClientEvtListener ): this
+    removeEventListener( evt: "error"                , listener: (err: Error) => void ): this
+    removeEventListener( evt: ChainSyncClientEvtName | "error", listener: ChainSyncClientEvtListener ): this
+
+    removeListener( evt: "rollBackwards"        , listener: ChainSyncClientEvtListener ): this
+    removeListener( evt: "rollForward"          , listener: ChainSyncClientEvtListener ): this
+    removeListener( evt: "intersectFound"       , listener: ChainSyncClientEvtListener ): this
+    removeListener( evt: "intersectNotFound"    , listener: ChainSyncClientEvtListener ): this
+    removeListener( evt: "awaitReply"           , listener: ChainSyncClientEvtListener ): this
+    removeListener( evt: "error"                , listener: (err: Error) => void ): this
+    removeListener( evt: ChainSyncClientEvtName | "error" , listener: ChainSyncClientEvtListener ): this
+
+    off( evt: "rollBackwards"        , listener: ChainSyncClientEvtListener ): this
+    off( evt: "rollForward"          , listener: ChainSyncClientEvtListener ): this
+    off( evt: "intersectFound"       , listener: ChainSyncClientEvtListener ): this
+    off( evt: "intersectNotFound"    , listener: ChainSyncClientEvtListener ): this
+    off( evt: "awaitReply"           , listener: ChainSyncClientEvtListener ): this
+    off( evt: "error"                , listener: ErrorListener ): this
+    off( evt: ChainSyncClientEvtName , listener: ChainSyncClientEvtListener ): this
+
+    removeAllListeners( event?: ChainSyncClientEvtName | "error" ): this
+
+    emit( evt: "rollBackwards"        , msg: ChainSyncRollBackwards ): boolean
+    emit( evt: "rollForward"          , msg: ChainSyncRollForward ): boolean
+    emit( evt: "intersectFound"       , msg: ChainSyncIntersectFound ): boolean
+    emit( evt: "intersectNotFound"    , msg: ChainSyncIntersectNotFound ): boolean
+    emit( evt: "awaitReply"           , msg: ChainSyncAwaitReply ): boolean
+    emit( evt: "error"                , err: Error ): boolean
+    emit( evt: ChainSyncClientEvtName | "error" , msg: ChainSyncMessage | Error ): boolean
+    
+    /**
+     * https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/dispatchEvent
+     * 
+     * @returns {true} `false` if event is cancelable, and at least one of the event handlers which received event called Event.preventDefault(). Otherwise `true`.
+     */
+    dispatchEvent( evt: "rollBackwards"        , msg: ChainSyncRollBackwards ): boolean
+    dispatchEvent( evt: "rollForward"          , msg: ChainSyncRollForward ): boolean
+    dispatchEvent( evt: "intersectFound"       , msg: ChainSyncIntersectFound ): boolean
+    dispatchEvent( evt: "intersectNotFound"    , msg: ChainSyncIntersectNotFound ): boolean
+    dispatchEvent( evt: "awaitReply"           , msg: ChainSyncAwaitReply ): boolean
+    dispatchEvent( evt: "error"                , err: Error ): boolean
+    dispatchEvent( evt: ChainSyncClientEvtName , msg: ChainSyncMessage ): boolean
 }
 
-export type BlockFetchResult = { ok: true, msg: undefined } | { ok: false, msg: bigint }
-
-type EvtListenerOf<Evt extends BlockFetchClientEvt> = ( ...args: any[] ) => any
-
-export class BlockFetchClient
+export class ChainSyncClient
 {
-    readonly _multiplexer: Multiplexer;
-    get multiplexer(): Multiplexer 
-    {
-        return this._multiplexer;
-    }
+    readonly mplexer: Multiplexer;
 
-    private _eventListeners: BlockFetchClientEvtListeners = Object.freeze({
-        noBlocks:       [],
-        batchDone:      [],
-        // error:          ( err: Error ) => {}
-    });
-    get eventListeners(): BlockFetchClientEvtListeners 
-    {
-        return this._eventListeners;
-    }
+    clearListeners!: ( event   ?: ChainSyncClientEvtName ) => this;
 
-    private _onceEventListeners: BlockFetchClientEvtListeners = Object.freeze({
-        noBlocks:       [],
-        batchDone:      [],
-        // error:          ( err: Error ) => {}
-    });
-    get onceEventListeners(): BlockFetchClientEvtListeners 
-    {
-        return this._onceEventListeners;
-    }
+    addEventListener:    <EvtName extends AnyChainSyncClientEvtName>( evt: EvtName, listener: EvtListenerOf<EvtName>, options?: AddEvtListenerOpts ) => this
+    addListener:         <EvtName extends AnyChainSyncClientEvtName>( evt: EvtName, listener: EvtListenerOf<EvtName> ) => this
+    on:                  <EvtName extends AnyChainSyncClientEvtName>( evt: EvtName, listener: EvtListenerOf<EvtName> ) => this
+    once:                <EvtName extends AnyChainSyncClientEvtName>( evt: EvtName, listener: EvtListenerOf<EvtName> ) => this
+    removeEventListener: <EvtName extends AnyChainSyncClientEvtName>( evt: EvtName, listener: EvtListenerOf<EvtName> ) => this
+    removeListener:      <EvtName extends AnyChainSyncClientEvtName>( evt: EvtName, listener: EvtListenerOf<EvtName> ) => this
+    off:                 <EvtName extends AnyChainSyncClientEvtName>( evt: EvtName, listener: EvtListenerOf<EvtName> ) => this
+    removeAllListeners:  ( event   ?: ChainSyncClientEvtName ) => this
+    emit:                <EvtName extends ChainSyncClientEvtName>( evt: EvtName, msg: MsgOf<EvtName> ) => boolean
+    dispatchEvent:       <EvtName extends ChainSyncClientEvtName>( evt: EvtName, msg: MsgOf<EvtName> ) => boolean
     
-    constructor( thisMultiplexer: Multiplexer )
+    /** @deprecated */
+    onRollBackwards: ( cb: ( msg: ChainSyncRollBackwards ) => void ) => void
+    /** @deprecated */
+    onRollForward: ( cb: ( msg: ChainSyncRollForward ) => void ) => void
+    /** @deprecated */
+    onIntersectFound: ( cb: ( msg: ChainSyncIntersectFound ) => void ) => void
+    /** @deprecated */
+    onIntersectNotFound: ( cb: ( msg: ChainSyncIntersectNotFound ) => void ) => void
+    /** @deprecated */
+    onAwaitReply: ( cb: ( msg: ChainSyncAwaitReply ) => void ) => void
+
+    constructor( multiplexer: Multiplexer )
     {
-        this._multiplexer = thisMultiplexer;
+        const self = this;
+
+        const eventListeners: ChainSyncClientEvtListeners = {
+            rollBackwards: [],
+            rollForward: [],
+            intersectFound: [],
+            intersectNotFound: [],
+            awaitReply: [],
+            error: []
+        };
+
+        const onceEventListeners: ChainSyncClientEvtListeners = {
+            rollBackwards: [],
+            rollForward: [],
+            intersectFound: [],
+            intersectNotFound: [],
+            awaitReply: [],
+            error: []
+        };
+
+        function clearListeners( evt?: ChainSyncClientEvtName ): typeof self
+        {
+            if( isAnyChainSyncClientEvtName( evt ) )
+            {
+                eventListeners[evt].length = 0;
+                onceEventListeners[evt].length = 0;
+                return self;
+            }
+            eventListeners.rollBackwards.length     = 0;
+            eventListeners.rollForward.length       = 0;
+            eventListeners.intersectFound.length    = 0;
+            eventListeners.intersectNotFound.length = 0;
+            eventListeners.awaitReply.length        = 0;
+
+            onceEventListeners.rollBackwards.length     = 0;
+            onceEventListeners.rollForward.length       = 0;
+            onceEventListeners.intersectFound.length    = 0;
+            onceEventListeners.intersectNotFound.length = 0;
+            onceEventListeners.awaitReply.length        = 0;
+
+            return self;
+        }
+
+        function hasEventListeners( includeError: boolean = false ): boolean
+        {
+            return  (
+                includeError ? (
+                    eventListeners.error.length             > 0 ||
+                    onceEventListeners.error.length         > 0
+                ) : true
+            ) && (
+                eventListeners.rollBackwards.length     > 0 ||
+                eventListeners.rollForward.length       > 0 ||
+                eventListeners.intersectFound.length    > 0 ||
+                eventListeners.intersectNotFound.length > 0 ||
+                eventListeners.awaitReply.length        > 0 ||
+
+                onceEventListeners.rollBackwards.length     > 0 ||
+                onceEventListeners.rollForward.length       > 0 ||
+                onceEventListeners.intersectFound.length    > 0 ||
+                onceEventListeners.intersectNotFound.length > 0 ||
+                onceEventListeners.awaitReply.length        > 0
+            );
+        }
+
+        /** @deprecated */
+        function onRollBackwards( cb: ( msg: ChainSyncRollBackwards ) => void ): void
+        {
+            eventListeners.rollBackwards.push( cb );
+        }
+        /** @deprecated */
+        function onRollForward( cb: ( msg: ChainSyncRollForward ) => void ): void
+        {
+            eventListeners.rollForward.push( cb );
+        }
+        /** @deprecated */
+        function onIntersectFound( cb: ( msg: ChainSyncIntersectFound ) => void ): void
+        {
+            eventListeners.intersectFound.push( cb );
+        }
+        /** @deprecated */
+        function onIntersectNotFound( cb: ( msg: ChainSyncIntersectNotFound ) => void ): void
+        {
+            eventListeners.intersectNotFound.push( cb );
+        }
+        /** @deprecated */
+        function onAwaitReply( cb: ( msg: ChainSyncAwaitReply ) => void ): void
+        {
+            eventListeners.awaitReply.push( cb );
+        }
+
+        function addEventListenerOnce( evt: AnyChainSyncClientEvtName, listener: AnyChainSyncClientEvtListener ): typeof self
+        {
+            if( !isAnyChainSyncClientEvtName( evt ) ) return self;
+
+            onceEventListeners[ evt ].push( listener as any );
+            return self;
+        }
+        function addEventListener( evt: AnyChainSyncClientEvtName, listener: ChainSyncClientEvtListener, opts?: AddEvtListenerOpts ): typeof self
+        {
+            if( opts?.once === true ) return addEventListenerOnce( evt, listener );
+            
+            if( !isAnyChainSyncClientEvtName( evt ) ) return self;
+            
+            eventListeners[ evt ].push( listener as any );
+            return self;
+        }
+        function removeEventListener( evt: AnyChainSyncClientEvtName, listener: ChainSyncClientEvtListener ): typeof self
+        {
+            if( !isAnyChainSyncClientEvtName( evt ) ) return self;
+
+            eventListeners[evt] = eventListeners[evt].filter( fn => fn !== listener ) as any;
+            onceEventListeners[evt] = onceEventListeners[evt].filter( fn => fn !== listener ) as any;
+            return self; 
+        }
+
+        function dispatchEvent( evt: AnyChainSyncClientEvtName, msg: ChainSyncMessage | Error ): boolean
+        {
+            // console.log( evt, msg );
+            if( !isAnyChainSyncClientEvtName( evt ) ) return true;
+            if( evt !== "error" && !isChainSyncMessage( msg ) ) return true;
+
+            const listeners = eventListeners[ evt ];
+            const nListeners = listeners.length;
+            for(let i = 0; i < nListeners; i++)
+            {
+                listeners[i](msg as any);
+            }
+
+            const onceListeners = onceEventListeners[evt];
+            while( onceListeners.length > 0 )
+            {
+                onceListeners.shift()!(msg as any);
+            }
+
+            return true;
+        }
+
+        Object.defineProperties(
+            this, {
+                mplexer:                { value: multiplexer, ...roDescr },
+                clearListeners:         { value: clearListeners, ...roDescr },
+                removeAllListeners:     { value: clearListeners, ...roDescr },
+                onRollBackwards:        { value: onRollBackwards, ...roDescr },
+                onRollForward:          { value: onRollForward, ...roDescr },
+                onIntersectFound:       { value: onIntersectFound, ...roDescr },
+                onIntersectNotFound:    { value: onIntersectNotFound, ...roDescr },
+                onAwaitReply:           { value: onAwaitReply, ...roDescr },
+                addEventListener:       { value: addEventListener, ...roDescr },
+                addListener:            { value: addEventListener, ...roDescr },
+                on:                     { value: addEventListener, ...roDescr },
+                once:                   { value: addEventListenerOnce, ...roDescr },
+                removeEventListener:    { value: removeEventListener, ...roDescr },
+                removeListener:         { value: removeEventListener, ...roDescr },
+                off:                    { value: removeEventListener, ...roDescr },
+                dispatchEvent:          { value: dispatchEvent, ...roDescr },
+                emit:                   { value: dispatchEvent, ...roDescr },
+            }
+        );
 
         let prevBytes: Uint8Array | undefined = undefined;
-        const queque: BlockFetchMessage[] = [];
+        const queque: ChainSyncMessage[] = [];
 
-        this.multiplexer.on( MiniProtocol.BlockFetch, ( chunk ) => {
-            if( !this.hasEventListeners() ) return;
+        multiplexer.on( MiniProtocol.ChainSync, chunk => {
+
+            if( !hasEventListeners() ) return;
 
             let offset: number = -1;
             let thing: { parsed: CborObj, offset: number };
 
-            let msg: BlockFetchMessage;
+            let msg: ChainSyncMessage;
 
             if( prevBytes )
             {
@@ -102,7 +371,6 @@ export class BlockFetchClient
             {
                 const originalSTLimit = Error.stackTraceLimit;
                 Error.stackTraceLimit = 0;
-
                 try {
                     thing = Cbor.parseWithOffset( chunk );
                 }
@@ -113,41 +381,34 @@ export class BlockFetchClient
                     prevBytes = Uint8Array.prototype.slice.call( chunk );
                     break;
                 }
-                // finally {
-                //     Error.stackTraceLimit = originalSTLimit;
-                // }
 
                 offset = thing.offset;
 
+                // console.log( "msg byetes", offset, toHex( chunk.subarray( 0, offset ) ) );
+                // Error.stackTraceLimit = 0;
                 try {
-                    msg = blockFetchMessageFromCborObj( thing.parsed );
-                    
+                    msg = chainSyncMessageFromCborObj( thing.parsed );
                     // @ts-ignore Cannot assign to 'cborBytes' because it is a read-only property.ts(2540)
                     msg.cborBytes = Uint8Array.prototype.slice.call( chunk, 0, offset );
-
+                    
                     queque.unshift( msg );
                 }
-                catch( e )
+                catch (e)
                 {
                     // before dispatch event
                     Error.stackTraceLimit = originalSTLimit;
 
-                    // console.error("-------------------------------------------------------");
-                    // console.error( "dbg_chunk", toHex( dbg_chunk ) );
-                    // console.error( "dbg_prev", dbg_prev ? toHex( dbg_prev ) : dbg_prev );
-                    // console.error("-------------------------------------------------------");
                     const err = new Error(
-                        ( typeof e?.message === "string" ? e.message : "" ) +
+                        typeof e?.message === "string" ? e.message : "" +
                         "\ndata: " + toHex( chunk ) + "\n"
                     );
                     
-                    // this.dispatchEvent( "error", err );
+                    dispatchEvent("error", err );
                 }
                 finally {
                     Error.stackTraceLimit = originalSTLimit;
                 }
 
-                
                 if( offset < chunk.length )
                 {
                     // reference same memory (`subarray`)
@@ -157,225 +418,88 @@ export class BlockFetchClient
                 }
             }
 
-            let msgStr: BlockFetchClientEvt;
+            let msgStr: ChainSyncClientEvtName;
             while( msg = queque.pop()! )
             {
                 msgStr = msgToName( msg )!;
+                if( !msgStr ) continue; // ingore messages not expected by the client
 
-                // ingore messages not expected by the client
-                if( !msgStr ) continue; 
-
-                this.dispatchEvent( msgStr, msg );
+                dispatchEvent( msgStr, msg );
             }
-
         });
     }
 
-    hasEventListeners(): boolean 
+    requestNext(): Promise<ChainSyncRollForward | ChainSyncRollBackwards>
     {
-        return this._hasEventListeners( this.eventListeners ) || this._hasEventListeners( this.onceEventListeners );
-    }
-    private _hasEventListeners( listeners: BlockFetchClientEvtListeners ): boolean 
-    {
-        return (
-            listeners.noBlocks.length   > 0       ||
-            listeners.batchDone.length  > 0
-        );
-    }
-
-    addEventListenerOnce<EvtName extends BlockFetchClientEvt>( evt: EvtName, listener: EvtListenerOf<EvtName> ) : typeof self 
-    {
-        const listeners = this.onceEventListeners[ evt ];
-
-        if( !Array.isArray( listeners ) ) return self;
-
-        listeners.push( listener );
-
-        return self;
-    }
-    once<EvtName extends BlockFetchClientEvt>( evt: EvtName, listener: EvtListenerOf<EvtName> ): typeof self 
-    {
-        return this.addEventListenerOnce( evt, listener );
-    }
-
-    addEventListener<EvtName extends BlockFetchClientEvt>( evt: EvtName, listener: EvtListenerOf<EvtName>, options?: AddEvtListenerOpts ): typeof self 
-    {
-        if( options?.once ) return this.addEventListenerOnce( evt, listener );
-        
-        const listeners = this.eventListeners[ evt ];
-
-        if( !Array.isArray( listeners ) ) return self;
-
-        listeners.push( listener );
-
-        return self;
-    }
-    addListener( evt: BlockFetchClientEvt, callback: ( data: any ) => void ): this
-    {
-        return this.on( evt, callback );
-    }
-    on( evt: BlockFetchClientEvt, callback: ( data: any ) => void ): this
-    {
-        const listeners = this.eventListeners[ evt ];
-        if( !listeners ) return this;
-
-        listeners.push( callback );
-        
-        return this;
-    }
-
-    removeEventListener<EvtName extends BlockFetchClientEvt>( evt: EvtName, listener: EvtListenerOf<EvtName> ): typeof self 
-    {
-        var listeners = this.eventListeners[evt];
-
-        if( !Array.isArray( listeners ) ) return self;
-
-        this.eventListeners[ evt ] = listeners.filter( fn => fn !== listener );
-        this.onceEventListeners[ evt ] = this.onceEventListeners[evt].filter( fn => fn !== listener );
-
-        return self;
-    }
-    removeListener( evt: BlockFetchClientEvt, callback: ( data: any ) => void )
-    {
-        return this.off( evt, callback );
-    }
-    off( evt: BlockFetchClientEvt, callback: ( data: any ) => void )
-    {
-        const listeners = this.eventListeners[ evt ];
-        if( !listeners ) return this;
-
-        const idx = listeners.findIndex(( cb ) => callback === cb );
-        if( idx < 0 ) return this;
-
-        void listeners.splice( idx, 1 );
-
-        return this;
-    }
-
-    emit<EvtName extends BlockFetchClientEvt>( evt: EvtName, msg: MsgOf<EvtName> ): boolean
-    {
-        return this.dispatchEvent( evt, msg );
-    }
-    dispatchEvent( evt: BlockFetchClientEvt, msg: BlockFetchMessage ) : boolean
-    {
-        var listeners = this.eventListeners[ evt ]
-
-        if( !listeners ) return true;
-
-        for( const cb of listeners ) cb( msg );
-
-        listeners = this.onceEventListeners[ evt ];
-        var cb: BlockFetchClientEvtListener;
-
-        while( cb = listeners.shift()! ) cb( msg );
-
-        return true;
-    }
-
-    removeAllListeners( evt?: BlockFetchClientEvt ): void
-    {
-        return this.clearListeners( evt );
-    }
-    clearListeners( evt?: BlockFetchClientEvt ) : void
-    {
-        this._clearListeners( this.eventListeners, evt );
-        this._clearListeners( this.onceEventListeners, evt );
-    }
-    private _clearListeners( listeners: BlockFetchClientEvtListeners, evt?: BlockFetchClientEvt ) : void
-    {
-        if( isTxSubClientEvtName( evt ) )
-        {
-            listeners[ evt ] = [];
-        }
-        else
-        {
-            for( const key in listeners )
-            {
-                if( listeners.hasOwnProperty( key ) ) 
-                {
-                    listeners[ key as BlockFetchClientEvt ] = [];
-                }
-            }
-        }
-    }
-
-    // block fetch client messages
-
-    /** request a single block from peer */
-    request( point: IChainPoint ): Promise<BlockFetchNoBlocks | BlockFetchBlock>
-    {
-        return this.requestRange(point, point)
-        .then( result => Array.isArray(result) ? result[0] : result );
-    }
-
-    requestRange( from: IChainPoint, to: IChainPoint ): Promise<BlockFetchNoBlocks | BlockFetchBlock[]>
-    {
-        if( isOriginPoint( from ) || isOriginPoint( to ) )
-        {
-            // this.dispatchEvent(
-            //     "error",
-            //     new Error(
-            //         "trying to request origin point; " +
-            //         "The Genesis Block exsists as a concept, but not really in a node database; " +
-            //         "BlockFetchClient::requestRange will resolve with `BlockFetchNoBlocks`; " +
-            //         "try with the first real block point"
-            //     )
-            // );
-
-            return Promise.resolve( new BlockFetchNoBlocks() );
-        }
-
         const self = this;
-        const blocks: BlockFetchBlock[] = [];
         return new Promise( resolve => {
-            function resolveBatch( _msg: BlockFetchBatchDone )
+            function resolveForward( msg: ChainSyncRollForward )
             {
-                self.removeEventListener("noBlocks", resolveNoBlocks);
-                self.removeEventListener("batchDone", resolveBatch);
-                self.removeEventListener("block", handleBlock);
-
-                if( blocks.length > 0 ) resolve( blocks );
-                else resolve( new BlockFetchNoBlocks() );
-                return;
-            }
-            function resolveNoBlocks( msg: BlockFetchNoBlocks )
-            {
-                self.removeEventListener("noBlocks", resolveNoBlocks);
-                self.removeEventListener("batchDone", resolveBatch);
-                self.removeEventListener("block", handleBlock);
-
+                self.removeEventListener("rollForward", resolveForward);
+                self.removeEventListener("rollBackwards", resolveBackwards);
                 resolve( msg );
-                return;
             }
-            // function handleStartBatch( msg: BlockFetchStartBatch ) {}
-            function handleBlock( msg: BlockFetchBlock )
+            function resolveBackwards( msg: ChainSyncRollBackwards )
             {
-                blocks.push( msg );
+                self.removeEventListener("rollForward", resolveForward);
+                self.removeEventListener("rollBackwards", resolveBackwards);
+                resolve( msg );
             }
-
-            self.once("noBlocks", resolveNoBlocks);
-            self.once("batchDone", resolveBatch);
-            self.on("block", handleBlock);
-
-            self.mplexer.send(
-                new BlockFetchRequestRange({ from, to }).toCbor().toBuffer(),
+            this.once("rollForward", resolveForward );
+            this.once("rollBackwards", resolveBackwards );
+            this.mplexer.send(
+                new ChainSyncRequestNext().toCbor().toBuffer(),
                 {
                     hasAgency: true,
-                    protocol: MiniProtocol.BlockFetch
+                    protocol: this.mplexer.isN2N ? 
+                        MiniProtocol.ChainSync :
+                        MiniProtocol.LocalChainSync
                 }
             );
         });
     }
 
+    findIntersect( points: IChainPoint[] ): Promise<ChainSyncIntersectFound | ChainSyncIntersectNotFound>
+    {
+        const self = this;
+        return new Promise( resolve => {
+            function resolveFound( msg: ChainSyncIntersectFound )
+            {
+                self.removeEventListener("intersectFound", resolveFound);
+                self.removeEventListener("intersectNotFound", resolveNotFound);
+                resolve( msg );
+            }
+            function resolveNotFound( msg: ChainSyncIntersectNotFound )
+            {
+                self.removeEventListener("intersectFound", resolveFound);
+                self.removeEventListener("intersectNotFound", resolveNotFound);
+                resolve( msg );
+            }
+            this.once("intersectFound", resolveFound );
+            this.once("intersectNotFound", resolveNotFound );
+            this.mplexer.send(
+                new ChainSyncFindIntersect({ points }).toCbor().toBuffer(),
+                {
+                    hasAgency: true,
+                    protocol: this.mplexer.isN2N ? 
+                        MiniProtocol.ChainSync :
+                        MiniProtocol.LocalChainSync
+                }
+            );
+        })
+    }
+
     done(): void
     {
         this.mplexer.send(
-            new BlockFetchClientDone().toCbor().toBuffer(),
+            new ChainSyncMessageDone().toCbor().toBuffer(),
             {
                 hasAgency: true,
-                protocol: MiniProtocol.BlockFetch
+                protocol: this.mplexer.isN2N ? 
+                    MiniProtocol.ChainSync :
+                    MiniProtocol.LocalChainSync
             }
         );
-        this.clearListeners()
+        this.clearListeners();
     }
 }
