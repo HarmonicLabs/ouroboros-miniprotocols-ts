@@ -4,7 +4,7 @@ import { Multiplexer } from "../../multiplexer/Multiplexer";
 import { IChainPoint } from "../types/ChainPoint";
 import { ChainSyncMessage, chainSyncMessageFromCborObj, isChainSyncMessage } from "./ChainSyncMessage";
 import { toHex } from "@harmoniclabs/uint8array-utils";
- import { AddEvtListenerOpts } from "../../common/AddEvtListenerOpts";
+import { AddEvtListenerOpts } from "../../common/AddEvtListenerOpts";
 import { ErrorListener } from "../../common/ErrorListener";
 import { ChainSyncRollBackwards, ChainSyncRollForward, ChainSyncIntersectFound, ChainSyncIntersectNotFound, ChainSyncAwaitReply, ChainSyncRequestNext, ChainSyncFindIntersect, ChainSyncMessageDone } from "./messages";
 

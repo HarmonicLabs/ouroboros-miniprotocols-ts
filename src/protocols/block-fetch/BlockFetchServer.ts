@@ -1,19 +1,20 @@
-import { ITxIdAndSize, TxSubmitDone, TxSubmitReplyIds, TxSubmitReplyTxs } from "./messages";
+import { ITxIdAndSize, TxSubmitDone, TxSubmitReplyIds, TxSubmitReplyTxs } from "../chain-sync/messages";
 import { TxSubmitMessage, txSubmitMessageFromCborObj } from "./TxSubmitMessage";
 import { AddEvtListenerOpts } from "../../common/AddEvtListenerOpts";
 import { TxSubmitRequestTxs } from "./messages/TxSubmitRequestTxs";
 import { TxSubmitRequestIds } from "./messages/TxSubmitRequestIds";
+import { Cbor, CborArray, CborObj } from "@harmoniclabs/cbor";
 import { Multiplexer } from "../../multiplexer/Multiplexer";
 import { IMempool, TxHashAndSize } from "./interfaces";
 import { MempoolTxHash } from "./interfaces/types";
-import { Cbor, CborObj } from "@harmoniclabs/cbor";
 import { MiniProtocol } from "../../MiniProtocol";
 
 type TxSubmitClientEvt = keyof TxSubmitClientEvtListeners & string;
 
 type TxSubmitClientEvtListeners = {
-    requestIds:     TxSubmitClientEvtListener[],
-    requestTxs:     TxSubmitClientEvtListener[]
+    requestRange: AnyBlockFetchClientEvtNameListener[],
+    startBatch: AnyBlockFetchClientEvtNameListener[],
+    block: AnyBlockFetchClientEvtNameListener[]
 };
 
 type TxSubmitClientEvtListener = ( msg: TxSubmitMessage ) => void;
