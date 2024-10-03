@@ -1,7 +1,7 @@
 import { CanBeCborString, Cbor, CborArray, CborBytes, CborObj, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
 import { isObject } from "@harmoniclabs/obj-utils";
 import { canBeUInteger } from "./ints";
-import { toHex } from "@harmoniclabs/uint8array-utils";
+import { toHex, uint8ArrayEq } from "@harmoniclabs/uint8array-utils";
 
 export interface IBlockHeaderHash {
     readonly slotNumber: number | bigint,
@@ -56,6 +56,11 @@ export class ChainPoint
     readonly blockHeader?: IBlockHeaderHash;
 
     isOrigin(): boolean { return isOriginPoint( this ) }
+
+    static get origin(): ChainPoint
+    {
+        return new ChainPoint({});
+    }
 
     constructor( chainPoint: IChainPoint )
     {
@@ -126,5 +131,18 @@ export class ChainPoint
                 hash: hash.buffer
             }
         });
+    }
+
+    static eq( a: IChainPoint, b: IChainPoint ): boolean
+    {
+        return (
+            ( a.blockHeader === undefined && b.blockHeader === undefined ) ||
+            (
+                isIBlockHeaderHash( a.blockHeader ) &&
+                isIBlockHeaderHash( b.blockHeader ) &&
+                BigInt(a.blockHeader.slotNumber) === BigInt(b.blockHeader.slotNumber) &&
+                uint8ArrayEq( a.blockHeader.hash, b.blockHeader.hash )
+            )
+        );
     }
 }

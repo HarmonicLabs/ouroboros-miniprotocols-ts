@@ -92,4 +92,12 @@ export class ChainTip
             blockNo: _blockNo.num
         });
     }
+
+    static eq( a: IChainTip, b: IChainTip ): boolean
+    {
+        return (
+            ChainPoint.eq( a.point, b.point ) &&
+            a.blockNo === b.blockNo
+        );
+    }
 }

@@ -3,11 +3,11 @@ import { ChainSyncMessage, isChainSyncMessage, chainSyncMessageFromCborObj } fro
 import { AddEvtListenerOpts } from "../../common/AddEvtListenerOpts";
 import { Multiplexer } from "../../multiplexer/Multiplexer";
 import { toHex } from "@harmoniclabs/uint8array-utils";
-import { Cbor, CborObj } from "@harmoniclabs/cbor";
+import { Cbor, CborBytes, CborObj, CborTag } from "@harmoniclabs/cbor";
 import { MiniProtocol } from "../../MiniProtocol";
 import { ChainPoint, IChainPoint } from "../types/ChainPoint";
 import { IChainDb } from "./interfaces/IChainDb";
-import { IChainTip } from "../types";
+import { ChainTip, IChainTip } from "../types";
 
 type ChainSyncServerEvtName     = keyof Omit<ChainSyncServerEvtListeners, "error">;
 type AnyChainSyncServerEvtName  = ChainSyncServerEvtName | "error";
@@ -60,48 +60,46 @@ type EvtListenerOf<EvtName extends AnyChainSyncServerEvtName> =
 
 export class ChainSyncServer
 {
-    readonly _multiplexer: Multiplexer;
-    get multiplexer(): Multiplexer 
-    {
-        return this._multiplexer;
-    }
+    readonly multiplexer: Multiplexer;
+    readonly chainDb: IChainDb;
 
-    readonly _chainDb: IChainDb;
-    get chainDb(): IChainDb 
-    {
-        return this._chainDb;
-    }
+    private clientIndex: bigint;
+    private tip: ChainTip;
+    private prevIntersectPoint: ChainPoint | undefined;
+    private synced: boolean;
 
-    private _eventListeners: ChainSyncServerEvtListeners = Object.freeze({
+    private eventListeners: ChainSyncServerEvtListeners = Object.freeze({
         requestNext:        [],
         findIntersect:      [],
         done:               [],
         error:              []
     });
-    get eventListeners(): ChainSyncServerEvtListeners 
-    {
-        return this._eventListeners;
-    }
 
-    private _onceEventListeners: ChainSyncServerEvtListeners = Object.freeze({
+    private onceEventListeners: ChainSyncServerEvtListeners = Object.freeze({
         requestNext:        [],
         findIntersect:      [],
         done:               [],
         error:              []
     });
-    get onceEventListeners(): ChainSyncServerEvtListeners 
-    {
-        return this._onceEventListeners;
-    }
     
     constructor(
         thisMultiplexer: Multiplexer,
         thisChainDb: IChainDb
     )
     {
-        this._multiplexer = thisMultiplexer;
-        this._chainDb = thisChainDb;
+        this.multiplexer = thisMultiplexer;
+        this.chainDb = thisChainDb;
 
+        // server state
+        this.clientIndex = BigInt(0);
+
+        this.tip = new ChainTip({ point: ChainPoint.origin, blockNo: 0 });
+        this.chainDb.getTip().then( tip => this.tip = new ChainTip( tip ) );
+
+        this.prevIntersectPoint = undefined;
+        this.synced = false;
+
+        // handle muliplexer messages s
         let prevBytes: Uint8Array | undefined = undefined;
         const queque: ChainSyncMessage[] = [];
 
@@ -186,12 +184,152 @@ export class ChainSyncServer
             }
         });
 
-        this.currentBlockNo = Number( this.chainDb.volatileDb.tip.blockNo );
-
         this.on("requestNext", ( msg: ChainSyncRequestNext ) => this.handleRequestNext() );
         this.on("findIntersect", ( msg: ChainSyncFindIntersect ) => this.handleFindIntersect( [...msg.points] ) );
         this.on("done", ( msg: ChainSyncMessageDone ) => {} );
     }
+
+    // chain-sync server messages implementation
+    
+    
+
+    async handleFindIntersect( points: ChainPoint[] ): Promise<void>
+    {
+        const intersection = await this.chainDb.findIntersect( ...points );
+        const tip = await this.chainDb.getTip();
+
+        if( !intersection )
+        {
+            this.sendIntersectNotFound( tip );
+            return
+        }
+
+        const { point, blockNo } = new ChainTip( intersection );
+
+        this.clientIndex = BigInt(blockNo);
+
+        this.prevIntersectPoint = point;
+        this.sendIntersectFound( point, tip );
+    }
+    async handleReqNext(): Promise<void>
+    {
+        const tip = await this.chainDb.getTip();
+
+        if( this.prevIntersectPoint !== undefined )
+        {
+            const point = this.prevIntersectPoint;
+            this.prevIntersectPoint = undefined;
+            this.sendRollBackwards( point, tip );
+            return;
+        }
+
+        if( !ChainTip.eq( this.tip, tip ) )
+        {
+            const intersection = await this.chainDb.findIntersect( this.tip.point, tip.point );
+            if( !intersection ) throw new Error("expected intersection not found");
+            
+            this.clientIndex = BigInt( intersection.blockNo );
+
+            this.sendRollBackwards( intersection.point, tip );
+            return;
+        }
+
+        if( this.synced )
+        {
+            const self = this;
+            this.sendAwaitReply();
+
+            // we'll send either a "RollBackwards" or a "RollForward"
+            function handleExtend( newTip: IChainTip )
+            {
+                
+                self.chainDb.off("extend", handleExtend );
+            }
+
+            this.chainDb.on("extend", handleExtend );
+            return;
+        }
+
+        // we are following the same chain (no forks)
+        // and the client is not yet synced (is behind)
+
+        this.clientIndex++;
+        const nextClientBlock = this.chainDb.getBlockNo( this.clientIndex );
+
+        if( this.clientIndex === this.tip.blockNo ) this.synced = true;
+
+        this.sendRollForward( nextClientBlock, tip );
+        return;
+    }
+
+    /**
+     * @pure
+     */
+    sendIntersectFound( point: IChainPoint, tip: IChainTip ): void
+    {
+        this.multiplexer.send(
+            new ChainSyncIntersectFound({ point, tip }).toCbor().toBuffer(),
+            { 
+                hasAgency: true, 
+                protocol: MiniProtocol.ChainSync 
+            }
+        );
+    }
+    /**
+     * @pure
+     */
+    sendIntersectNotFound( tip: IChainTip ): void
+    {
+        this.multiplexer.send(
+            new ChainSyncIntersectNotFound({ tip }).toCbor().toBuffer(),
+            { 
+                hasAgency: true, 
+                protocol: MiniProtocol.ChainSync 
+            }
+        );
+    }
+
+    
+    sendAwaitReply(): void
+    {
+        this.multiplexer.send(
+            new ChainSyncAwaitReply().toCbor().toBuffer(),
+            { 
+                hasAgency: true, 
+                protocol: MiniProtocol.ChainSync 
+            }
+        );
+    }
+    async sendRollBackwards( rollbackPoint: IChainPoint, tip?: IChainTip ): Promise<void>
+    {
+        this.synced = false;
+        this.multiplexer.send(
+            new ChainSyncRollBackwards({ 
+                point: rollbackPoint, 
+                tip: tip ?? await this.chainDb.getTip()
+            }).toCbor().toBuffer(),
+            { 
+                hasAgency: true, 
+                protocol: MiniProtocol.ChainSync 
+            }
+        );
+    }
+    async sendRollForward( data: Uint8Array, tip?: IChainTip ): Promise<void>
+    {
+        this.synced = false;
+        this.multiplexer.send(
+            new ChainSyncRollForward({ 
+                data: new CborTag(24, new CborBytes( data )),
+                tip: tip ?? await this.chainDb.getTip()
+            }).toCbor().toBuffer(),
+            { 
+                hasAgency: true, 
+                protocol: MiniProtocol.ChainSync 
+            }
+        );
+    }
+
+    // event listeners
 
     hasEventListeners(): boolean 
     {
@@ -324,122 +462,6 @@ export class ChainSyncServer
                     listeners[key as ChainSyncServerEvtName] = [];
                 }
             }
-        }
-    }
-
-    // chain-sync server messages implementation
-
-    private currentBlockNo: number;
-
-    handleRequestNext(): void
-    {
-        const point = this.chainDb.volatileDb.main[ this.currentBlockNo ];
-    }
-    replyAwaitReply( point: IChainPoint ): void
-    {
-        this.multiplexer.send(
-            new ChainSyncAwaitReply().toCbor().toBuffer(),
-            { 
-                hasAgency: true, 
-                protocol: MiniProtocol.ChainSync 
-            }
-        );
-    }
-    replyRollForward( point: IChainPoint ): void
-    {
-        this.updateCurrentBlockNo( -1 );
-
-        this.multiplexer.send(
-            new ChainSyncRollForward().toCbor().toBuffer(),
-            { 
-                hasAgency: true, 
-                protocol: MiniProtocol.ChainSync 
-            }
-        );
-    }
-    replyRollBackwards( point: IChainPoint ): void
-    {
-        this.updateCurrentBlockNo( +1 );
-
-        this.multiplexer.send(
-            new ChainSyncRollBackwards({
-                point: this.chainDb.volatileDb.hashToBlockData( ),
-                tip: this.chainDb.volatileDb.tip
-            }).toCbor().toBuffer(),
-            { 
-                hasAgency: true, 
-                protocol: MiniProtocol.ChainSync 
-            }
-        );
-    }
-
-    async handleFindIntersect( points: ChainPoint[] ): Promise<void>
-    {
-        // to be sure we order the points from higher to lower slotNumber
-        points.sort((a, b) => {
-            if (!b.blockHeader || !a.blockHeader) return 0;
-
-            const slotNumberA = typeof a.blockHeader.slotNumber === 'bigint' ? Number(a.blockHeader.slotNumber) : a.blockHeader.slotNumber;
-            const slotNumberB = typeof b.blockHeader.slotNumber === 'bigint' ? Number(b.blockHeader.slotNumber) : b.blockHeader.slotNumber;
-            
-            return slotNumberB - slotNumberA;
-        })
-        
-        // last generated point of the main chain (IChainDb handled)
-        const tip = this.chainDb.volatileDb.tip;
-
-        var pastBlockCounter = 0;
-        
-        for( const point of points )
-        {
-            var intersect = await this.chainDb.volatileDb.findIntersect( tip.point, point );
-            
-            if( intersect )
-            {
-                this.updateCurrentBlockNo( pastBlockCounter, intersect );
-
-                this.replyIntersectFound( intersect, tip );
-                break;
-            }
-
-            pastBlockCounter++;
-        }
-        
-        this.replyIntersectNotFound( tip );
-    }
-    replyIntersectFound( point: IChainPoint, tip: IChainTip ): void
-    {
-        this.multiplexer.send(
-            new ChainSyncIntersectFound({ point, tip }).toCbor().toBuffer(),
-            { 
-                hasAgency: true, 
-                protocol: MiniProtocol.ChainSync 
-            }
-        );
-    }
-    replyIntersectNotFound( tip: IChainTip ): void
-    {
-        this.multiplexer.send(
-            new ChainSyncIntersectNotFound({ tip }).toCbor().toBuffer(),
-            { 
-                hasAgency: true, 
-                protocol: MiniProtocol.ChainSync 
-            }
-        );
-    }
-
-    // pastBlockCounter is > 0 for rollBackwars and < 0 for rollForward
-    private updateCurrentBlockNo( pastBlockCounter: number, point?: IChainPoint ): void
-    {
-        if( point && point.blockHeader )
-        {
-            this.currentBlockNo = this.chainDb.volatileDb.hashToBlockData( point.blockHeader.hash ).blockNo;
-        }
-        else
-        {
-            // not a really nice solution but it works since every point is generated in sequence,
-            // slotNumber is incremental and points is ordered from higher to lower slotNumber
-            this.currentBlockNo = this.currentBlockNo - pastBlockCounter;
         }
     }
 }
