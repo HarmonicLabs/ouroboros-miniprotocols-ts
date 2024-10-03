@@ -1,16 +1,41 @@
-import { IChainPoint } from "../../types";
+import { IChainPoint, IChainTip, RealPoint } from "../../types";
+import { LookupBlockInfosFn } from "./IBlockInfos";
 
-export interface IChainDb {
-    volatile: IVolatileDb;
-    immutable: IImmutableDb;
+export interface IChainDb 
+{
+    readonly volatileDb: IVolatileDb;
+    readonly immutableDb: IImmutableDb;
 }
 
 /**
- * 
+ * to iterate volatile database
  */
-export interface IVolatileDb {
+export interface IVolatileDb 
+{
+    // main chain
+    readonly main: RealPoint[];
 
-    findIntersect( a: IChainPoint, b: IChainPoint ): Promise<IChainPoint | undefined>;
+    // main chain forks
+    readonly forks: IChainFork[];
+
+    // last block of the volataile database on the main chain
+    readonly tip: IChainTip;
+
+    // first block of the volataile database
+    readonly anchor: RealPoint;
+
+    hashToBlockData: LookupBlockInfosFn;
+
+    findIntersect( from: IChainPoint, to: IChainPoint ): Promise<IChainPoint | undefined>;
+}
+
+export interface IChainFork 
+{
+    /** point in the main chain */
+    readonly intersection: RealPoint;
+
+    /** continuation from intersection */
+    readonly fragment: RealPoint[];
 }
 
 /**
@@ -18,6 +43,9 @@ export interface IVolatileDb {
  * 
  * CANNOT FORK HERE
 */ 
-export interface IImmutableDb {
-
+export interface IImmutableDb 
+{
+    readonly path: string;
+    readonly chainDb: IChainDb;
+    readonly chunks: number;
 }

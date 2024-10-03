@@ -1,361 +1,112 @@
+import { ChainSyncAwaitReply, ChainSyncFindIntersect, ChainSyncIntersectFound, ChainSyncIntersectNotFound, ChainSyncMessageDone, ChainSyncRequestNext, ChainSyncRollBackwards, ChainSyncRollForward } from "./messages";
+import { ChainSyncMessage, isChainSyncMessage, chainSyncMessageFromCborObj } from "./ChainSyncMessage";
+import { AddEvtListenerOpts } from "../../common/AddEvtListenerOpts";
+import { Multiplexer } from "../../multiplexer/Multiplexer";
+import { toHex } from "@harmoniclabs/uint8array-utils";
 import { Cbor, CborObj } from "@harmoniclabs/cbor";
 import { MiniProtocol } from "../../MiniProtocol";
-import { Multiplexer } from "../../multiplexer/Multiplexer";
-import { IChainPoint } from "../types/ChainPoint";
-import { ChainSyncMessage, chainSyncMessageFromCborObj, isChainSyncMessage } from "./ChainSyncMessage";
-import { toHex } from "@harmoniclabs/uint8array-utils";
- import { AddEvtListenerOpts } from "../../common/AddEvtListenerOpts";
-import { ErrorListener } from "../../common/ErrorListener";
-import { ChainSyncRollBackwards, ChainSyncRollForward, ChainSyncIntersectFound, ChainSyncIntersectNotFound, ChainSyncAwaitReply, ChainSyncRequestNext, ChainSyncFindIntersect, ChainSyncMessageDone } from "./messages";
+import { ChainPoint, IChainPoint } from "../types/ChainPoint";
+import { IChainDb } from "./interfaces/IChainDb";
+import { IChainTip } from "../types";
 
-const roDescr = Object.freeze({
-    writable: false,
-    enumerable: true,
-    configurable: false
-});
-
-type ChainSyncServerEvtListener = ( msg: ChainSyncMessage ) => void;
-type AnyChainSyncServerEvtListener = ChainSyncServerEvtListener | (( err: Error ) => void);
+type ChainSyncServerEvtName     = keyof Omit<ChainSyncServerEvtListeners, "error">;
+type AnyChainSyncServerEvtName  = ChainSyncServerEvtName | "error";
 
 type ChainSyncServerEvtListeners = {
-    rollBackwards: ChainSyncServerEvtListener[]
-    rollForward: ChainSyncServerEvtListener[]
-    intersectFound: ChainSyncServerEvtListener[]
-    intersectNotFound: ChainSyncServerEvtListener[]
-    awaitReply: ChainSyncServerEvtListener[],
-    error: (( err: Error ) => void)[]
+    requestNext     : ChainSyncServerEvtListener[]
+    findIntersect   : ChainSyncServerEvtListener[],
+    done            : ChainSyncServerEvtListener[],
+    error           : (( err: Error ) => void)[]
 };
 
-type ChainSyncServerEvtName = keyof Omit<ChainSyncServerEvtListeners,"error">;
-type AnyChainSyncServerEvtName = ChainSyncServerEvtName | "error";
-
-type EvtListenerOf<EvtName extends AnyChainSyncServerEvtName> =
-    EvtName extends "rollBackwards"     ? ( msg: ChainSyncRollBackwards ) => void :
-    EvtName extends "rollForward"       ? ( msg: ChainSyncRollForward ) => void :
-    EvtName extends "intersectFound"    ? ( msg: ChainSyncIntersectFound) => void :
-    EvtName extends "intersectNotFound" ? ( msg: ChainSyncIntersectNotFound ) => void :
-    EvtName extends "awaitReply"        ? ( msg: ChainSyncAwaitReply ) => void :
-    EvtName extends "error"             ? ( err: Error ) => void :
-    never;
+type ChainSyncServerEvtListener     = ( msg: ChainSyncMessage ) => void;
+type AnyChainSyncServerEvtListener  = ChainSyncServerEvtListener | (( err: Error ) => void);
 
 type MsgOf<EvtName extends AnyChainSyncServerEvtName> =
-    EvtName extends "rollBackwards"     ? ChainSyncRollBackwards :
-    EvtName extends "rollForward"       ? ChainSyncRollForward :
-    EvtName extends "intersectFound"    ? ChainSyncIntersectFound :
-    EvtName extends "intersectNotFound" ? ChainSyncIntersectNotFound :
-    EvtName extends "awaitReply"        ? ChainSyncAwaitReply :
-    EvtName extends "error"             ? Error :
+    EvtName extends "requestNext"           ? ChainSyncRequestNext      :
+    EvtName extends "findIntersect"         ? ChainSyncFindIntersect    :
+    EvtName extends "done"                  ? ChainSyncMessageDone      :
+    EvtName extends "error"                 ? Error                     :
     never;
 
-function isChainSyncServerEvtName( str: any ): str is ChainSyncServerEvtName
+function msgToName( msg: ChainSyncMessage ): ChainSyncServerEvtName | undefined
 {
-    return (
-        str === "rollBackwards" ||
-        str === "rollForward" ||
-        str === "intersectFound" ||
-        str === "intersectNotFound" ||
-        str === "awaitReply"
-    );
+    if( msg instanceof ChainSyncRequestNext )       return "requestNext"    ;
+    if( msg instanceof ChainSyncFindIntersect )     return "findIntersect"  ;
+    if( msg instanceof ChainSyncMessageDone )       return "done"           ;
+
+    return undefined;
 }
 
 function isAnyChainSyncServerEvtName( str: any ): str is AnyChainSyncServerEvtName
 {
     return isChainSyncServerEvtName( str ) || str === "error";
 }
-
-function msgToName( msg: ChainSyncMessage ): ChainSyncServerEvtName | undefined
+function isChainSyncServerEvtName( str: any ): str is ChainSyncServerEvtName
 {
-    if( msg instanceof ChainSyncRollBackwards ) return "rollBackwards";
-    if( msg instanceof ChainSyncRollForward ) return "rollForward";
-    if( msg instanceof ChainSyncIntersectFound ) return "intersectFound";
-    if( msg instanceof ChainSyncIntersectNotFound ) return "intersectNotFound";
-    if( msg instanceof ChainSyncAwaitReply ) return "awaitReply";
-
-    return undefined;
+    return (
+        str === "requestNext"       ||
+        str === "findIntersect"     ||
+        str === "done"
+    );
 }
 
-export interface IChainSyncServer {
-    readonly mplexer: Multiplexer,
-
-    addEventListener( evt: "rollBackwards"        , listener: ChainSyncServerEvtListener, options?: AddEvtListenerOpts ): this
-    addEventListener( evt: "rollForward"          , listener: ChainSyncServerEvtListener, options?: AddEvtListenerOpts ): this
-    addEventListener( evt: "intersectFound"       , listener: ChainSyncServerEvtListener, options?: AddEvtListenerOpts ): this
-    addEventListener( evt: "intersectNotFound"    , listener: ChainSyncServerEvtListener, options?: AddEvtListenerOpts ): this
-    addEventListener( evt: "awaitReply"           , listener: ChainSyncServerEvtListener, options?: AddEvtListenerOpts ): this
-    addEventListener( evt: "error"                , listener: (err: Error) => void ): this
-    addEventListener( evt: AnyChainSyncServerEvtName , listener: AnyChainSyncServerEvtListener, options?: AddEvtListenerOpts ): this
-
-    addListener( evt: "rollBackwards"        , listener: ChainSyncServerEvtListener ): this
-    addListener( evt: "rollForward"          , listener: ChainSyncServerEvtListener ): this
-    addListener( evt: "intersectFound"       , listener: ChainSyncServerEvtListener ): this
-    addListener( evt: "intersectNotFound"    , listener: ChainSyncServerEvtListener ): this
-    addListener( evt: "awaitReply"           , listener: ChainSyncServerEvtListener ): this
-    addListener( evt: "error"                , listener: (err: Error) => void): this
-    addListener( evt: AnyChainSyncServerEvtName , listener: ChainSyncServerEvtListener ): this
-
-    on( evt: "rollBackwards"        , listener: ChainSyncServerEvtListener ): this
-    on( evt: "rollForward"          , listener: ChainSyncServerEvtListener ): this
-    on( evt: "intersectFound"       , listener: ChainSyncServerEvtListener ): this
-    on( evt: "intersectNotFound"    , listener: ChainSyncServerEvtListener ): this
-    on( evt: "awaitReply"           , listener: ChainSyncServerEvtListener ): this
-    on( evt: "error"                , listener: (err: Error) => void ): this
-    on( evt: ChainSyncServerEvtName , listener: ChainSyncServerEvtListener ): this
-
-    once( evt: "rollBackwards"        , listener: ChainSyncServerEvtListener ): this
-    once( evt: "rollForward"          , listener: ChainSyncServerEvtListener ): this
-    once( evt: "intersectFound"       , listener: ChainSyncServerEvtListener ): this
-    once( evt: "intersectNotFound"    , listener: ChainSyncServerEvtListener ): this
-    once( evt: "awaitReply"           , listener: ChainSyncServerEvtListener ): this
-    once( evt: "error"                , listener: (err: Error) => void ): this
-    once( evt: ChainSyncServerEvtName , listener: ChainSyncServerEvtListener ): this
-
-    removeEventListener( evt: "rollBackwards"        , listener: ChainSyncServerEvtListener ): this
-    removeEventListener( evt: "rollForward"          , listener: ChainSyncServerEvtListener ): this
-    removeEventListener( evt: "intersectFound"       , listener: ChainSyncServerEvtListener ): this
-    removeEventListener( evt: "intersectNotFound"    , listener: ChainSyncServerEvtListener ): this
-    removeEventListener( evt: "awaitReply"           , listener: ChainSyncServerEvtListener ): this
-    removeEventListener( evt: "error"                , listener: (err: Error) => void ): this
-    removeEventListener( evt: ChainSyncServerEvtName | "error", listener: ChainSyncServerEvtListener ): this
-
-    removeListener( evt: "rollBackwards"        , listener: ChainSyncServerEvtListener ): this
-    removeListener( evt: "rollForward"          , listener: ChainSyncServerEvtListener ): this
-    removeListener( evt: "intersectFound"       , listener: ChainSyncServerEvtListener ): this
-    removeListener( evt: "intersectNotFound"    , listener: ChainSyncServerEvtListener ): this
-    removeListener( evt: "awaitReply"           , listener: ChainSyncServerEvtListener ): this
-    removeListener( evt: "error"                , listener: (err: Error) => void ): this
-    removeListener( evt: ChainSyncServerEvtName | "error" , listener: ChainSyncServerEvtListener ): this
-
-    off( evt: "rollBackwards"        , listener: ChainSyncServerEvtListener ): this
-    off( evt: "rollForward"          , listener: ChainSyncServerEvtListener ): this
-    off( evt: "intersectFound"       , listener: ChainSyncServerEvtListener ): this
-    off( evt: "intersectNotFound"    , listener: ChainSyncServerEvtListener ): this
-    off( evt: "awaitReply"           , listener: ChainSyncServerEvtListener ): this
-    off( evt: "error"                , listener: ErrorListener ): this
-    off( evt: ChainSyncServerEvtName , listener: ChainSyncServerEvtListener ): this
-
-    removeAllListeners( event?: ChainSyncServerEvtName | "error" ): this
-
-    emit( evt: "rollBackwards"        , msg: ChainSyncRollBackwards ): boolean
-    emit( evt: "rollForward"          , msg: ChainSyncRollForward ): boolean
-    emit( evt: "intersectFound"       , msg: ChainSyncIntersectFound ): boolean
-    emit( evt: "intersectNotFound"    , msg: ChainSyncIntersectNotFound ): boolean
-    emit( evt: "awaitReply"           , msg: ChainSyncAwaitReply ): boolean
-    emit( evt: "error"                , err: Error ): boolean
-    emit( evt: ChainSyncServerEvtName | "error" , msg: ChainSyncMessage | Error ): boolean
-    
-    /**
-     * https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/dispatchEvent
-     * 
-     * @returns {true} `false` if event is cancelable, and at least one of the event handlers which received event called Event.preventDefault(). Otherwise `true`.
-     */
-    dispatchEvent( evt: "rollBackwards"        , msg: ChainSyncRollBackwards ): boolean
-    dispatchEvent( evt: "rollForward"          , msg: ChainSyncRollForward ): boolean
-    dispatchEvent( evt: "intersectFound"       , msg: ChainSyncIntersectFound ): boolean
-    dispatchEvent( evt: "intersectNotFound"    , msg: ChainSyncIntersectNotFound ): boolean
-    dispatchEvent( evt: "awaitReply"           , msg: ChainSyncAwaitReply ): boolean
-    dispatchEvent( evt: "error"                , err: Error ): boolean
-    dispatchEvent( evt: ChainSyncServerEvtName , msg: ChainSyncMessage ): boolean
-}
+type EvtListenerOf<EvtName extends AnyChainSyncServerEvtName> =
+    EvtName extends "requestNext"   ? ( msg: ChainSyncRollBackwards )   => void :
+    EvtName extends "findIntersect" ? ( msg: ChainSyncRollForward )     => void :
+    EvtName extends "done"          ? ( msg: ChainSyncIntersectFound)   => void :
+    EvtName extends "error"         ? ( err: Error )                    => void :  
+    never                                                                       ;
 
 export class ChainSyncServer
 {
-    readonly mplexer: Multiplexer;
+    readonly _multiplexer: Multiplexer;
+    get multiplexer(): Multiplexer 
+    {
+        return this._multiplexer;
+    }
 
-    clearListeners!: ( event   ?: ChainSyncServerEvtName ) => this;
+    readonly _chainDb: IChainDb;
+    get chainDb(): IChainDb 
+    {
+        return this._chainDb;
+    }
 
-    addEventListener:    <EvtName extends AnyChainSyncServerEvtName>( evt: EvtName, listener: EvtListenerOf<EvtName>, options?: AddEvtListenerOpts ) => this
-    addListener:         <EvtName extends AnyChainSyncServerEvtName>( evt: EvtName, listener: EvtListenerOf<EvtName> ) => this
-    on:                  <EvtName extends AnyChainSyncServerEvtName>( evt: EvtName, listener: EvtListenerOf<EvtName> ) => this
-    once:                <EvtName extends AnyChainSyncServerEvtName>( evt: EvtName, listener: EvtListenerOf<EvtName> ) => this
-    removeEventListener: <EvtName extends AnyChainSyncServerEvtName>( evt: EvtName, listener: EvtListenerOf<EvtName> ) => this
-    removeListener:      <EvtName extends AnyChainSyncServerEvtName>( evt: EvtName, listener: EvtListenerOf<EvtName> ) => this
-    off:                 <EvtName extends AnyChainSyncServerEvtName>( evt: EvtName, listener: EvtListenerOf<EvtName> ) => this
-    removeAllListeners:  ( event   ?: ChainSyncServerEvtName ) => this
-    emit:                <EvtName extends ChainSyncServerEvtName>( evt: EvtName, msg: MsgOf<EvtName> ) => boolean
-    dispatchEvent:       <EvtName extends ChainSyncServerEvtName>( evt: EvtName, msg: MsgOf<EvtName> ) => boolean
+    private _eventListeners: ChainSyncServerEvtListeners = Object.freeze({
+        requestNext:        [],
+        findIntersect:      [],
+        done:               [],
+        error:              []
+    });
+    get eventListeners(): ChainSyncServerEvtListeners 
+    {
+        return this._eventListeners;
+    }
+
+    private _onceEventListeners: ChainSyncServerEvtListeners = Object.freeze({
+        requestNext:        [],
+        findIntersect:      [],
+        done:               [],
+        error:              []
+    });
+    get onceEventListeners(): ChainSyncServerEvtListeners 
+    {
+        return this._onceEventListeners;
+    }
     
-    /** @deprecated */
-    onRollBackwards: ( cb: ( msg: ChainSyncRollBackwards ) => void ) => void
-    /** @deprecated */
-    onRollForward: ( cb: ( msg: ChainSyncRollForward ) => void ) => void
-    /** @deprecated */
-    onIntersectFound: ( cb: ( msg: ChainSyncIntersectFound ) => void ) => void
-    /** @deprecated */
-    onIntersectNotFound: ( cb: ( msg: ChainSyncIntersectNotFound ) => void ) => void
-    /** @deprecated */
-    onAwaitReply: ( cb: ( msg: ChainSyncAwaitReply ) => void ) => void
-
     constructor(
-        multiplexer: Multiplexer,
-        chainDb: IChainDb
+        thisMultiplexer: Multiplexer,
+        thisChainDb: IChainDb
     )
     {
-        const self = this;
-
-        const eventListeners: ChainSyncServerEvtListeners = {
-            rollBackwards: [],
-            rollForward: [],
-            intersectFound: [],
-            intersectNotFound: [],
-            awaitReply: [],
-            error: []
-        };
-
-        const onceEventListeners: ChainSyncServerEvtListeners = {
-            rollBackwards: [],
-            rollForward: [],
-            intersectFound: [],
-            intersectNotFound: [],
-            awaitReply: [],
-            error: []
-        };
-
-        function clearListeners( evt?: ChainSyncServerEvtName ): typeof self
-        {
-            if( isAnyChainSyncServerEvtName( evt ) )
-            {
-                eventListeners[evt].length = 0;
-                onceEventListeners[evt].length = 0;
-                return self;
-            }
-            eventListeners.rollBackwards.length     = 0;
-            eventListeners.rollForward.length       = 0;
-            eventListeners.intersectFound.length    = 0;
-            eventListeners.intersectNotFound.length = 0;
-            eventListeners.awaitReply.length        = 0;
-
-            onceEventListeners.rollBackwards.length     = 0;
-            onceEventListeners.rollForward.length       = 0;
-            onceEventListeners.intersectFound.length    = 0;
-            onceEventListeners.intersectNotFound.length = 0;
-            onceEventListeners.awaitReply.length        = 0;
-
-            return self;
-        }
-
-        function hasEventListeners( includeError: boolean = false ): boolean
-        {
-            return  (
-                includeError ? (
-                    eventListeners.error.length             > 0 ||
-                    onceEventListeners.error.length         > 0
-                ) : true
-            ) && (
-                eventListeners.rollBackwards.length     > 0 ||
-                eventListeners.rollForward.length       > 0 ||
-                eventListeners.intersectFound.length    > 0 ||
-                eventListeners.intersectNotFound.length > 0 ||
-                eventListeners.awaitReply.length        > 0 ||
-
-                onceEventListeners.rollBackwards.length     > 0 ||
-                onceEventListeners.rollForward.length       > 0 ||
-                onceEventListeners.intersectFound.length    > 0 ||
-                onceEventListeners.intersectNotFound.length > 0 ||
-                onceEventListeners.awaitReply.length        > 0
-            );
-        }
-
-        /** @deprecated */
-        function onRollBackwards( cb: ( msg: ChainSyncRollBackwards ) => void ): void
-        {
-            eventListeners.rollBackwards.push( cb );
-        }
-        /** @deprecated */
-        function onRollForward( cb: ( msg: ChainSyncRollForward ) => void ): void
-        {
-            eventListeners.rollForward.push( cb );
-        }
-        /** @deprecated */
-        function onIntersectFound( cb: ( msg: ChainSyncIntersectFound ) => void ): void
-        {
-            eventListeners.intersectFound.push( cb );
-        }
-        /** @deprecated */
-        function onIntersectNotFound( cb: ( msg: ChainSyncIntersectNotFound ) => void ): void
-        {
-            eventListeners.intersectNotFound.push( cb );
-        }
-        /** @deprecated */
-        function onAwaitReply( cb: ( msg: ChainSyncAwaitReply ) => void ): void
-        {
-            eventListeners.awaitReply.push( cb );
-        }
-
-        function addEventListenerOnce( evt: AnyChainSyncServerEvtName, listener: AnyChainSyncServerEvtListener ): typeof self
-        {
-            if( !isAnyChainSyncServerEvtName( evt ) ) return self;
-
-            onceEventListeners[ evt ].push( listener as any );
-            return self;
-        }
-        function addEventListener( evt: AnyChainSyncServerEvtName, listener: ChainSyncServerEvtListener, opts?: AddEvtListenerOpts ): typeof self
-        {
-            if( opts?.once === true ) return addEventListenerOnce( evt, listener );
-            
-            if( !isAnyChainSyncServerEvtName( evt ) ) return self;
-            
-            eventListeners[ evt ].push( listener as any );
-            return self;
-        }
-        function removeEventListener( evt: AnyChainSyncServerEvtName, listener: ChainSyncServerEvtListener ): typeof self
-        {
-            if( !isAnyChainSyncServerEvtName( evt ) ) return self;
-
-            eventListeners[evt] = eventListeners[evt].filter( fn => fn !== listener ) as any;
-            onceEventListeners[evt] = onceEventListeners[evt].filter( fn => fn !== listener ) as any;
-            return self; 
-        }
-
-        function dispatchEvent( evt: AnyChainSyncServerEvtName, msg: ChainSyncMessage | Error ): boolean
-        {
-            // console.log( evt, msg );
-            if( !isAnyChainSyncServerEvtName( evt ) ) return true;
-            if( evt !== "error" && !isChainSyncMessage( msg ) ) return true;
-
-            const listeners = eventListeners[ evt ];
-            const nListeners = listeners.length;
-            for(let i = 0; i < nListeners; i++)
-            {
-                listeners[i](msg as any);
-            }
-
-            const onceListeners = onceEventListeners[evt];
-            while( onceListeners.length > 0 )
-            {
-                onceListeners.shift()!(msg as any);
-            }
-
-            return true;
-        }
-
-        Object.defineProperties(
-            this, {
-                mplexer:                { value: multiplexer, ...roDescr },
-                clearListeners:         { value: clearListeners, ...roDescr },
-                removeAllListeners:     { value: clearListeners, ...roDescr },
-                onRollBackwards:        { value: onRollBackwards, ...roDescr },
-                onRollForward:          { value: onRollForward, ...roDescr },
-                onIntersectFound:       { value: onIntersectFound, ...roDescr },
-                onIntersectNotFound:    { value: onIntersectNotFound, ...roDescr },
-                onAwaitReply:           { value: onAwaitReply, ...roDescr },
-                addEventListener:       { value: addEventListener, ...roDescr },
-                addListener:            { value: addEventListener, ...roDescr },
-                on:                     { value: addEventListener, ...roDescr },
-                once:                   { value: addEventListenerOnce, ...roDescr },
-                removeEventListener:    { value: removeEventListener, ...roDescr },
-                removeListener:         { value: removeEventListener, ...roDescr },
-                off:                    { value: removeEventListener, ...roDescr },
-                dispatchEvent:          { value: dispatchEvent, ...roDescr },
-                emit:                   { value: dispatchEvent, ...roDescr },
-            }
-        );
+        this._multiplexer = thisMultiplexer;
+        this._chainDb = thisChainDb;
 
         let prevBytes: Uint8Array | undefined = undefined;
         const queque: ChainSyncMessage[] = [];
 
-        multiplexer.on( MiniProtocol.ChainSync, chunk => {
-
-            if( !hasEventListeners() ) return;
+        this.multiplexer.on( MiniProtocol.ChainSync, ( chunk ) => {
+            if( !this.hasEventListeners() ) return;
 
             let offset: number = -1;
             let thing: { parsed: CborObj, offset: number };
@@ -375,7 +126,8 @@ export class ChainSyncServer
             {
                 const originalSTLimit = Error.stackTraceLimit;
                 Error.stackTraceLimit = 0;
-                try {
+                try
+                {
                     thing = Cbor.parseWithOffset( chunk );
                 }
                 catch
@@ -390,14 +142,15 @@ export class ChainSyncServer
 
                 // console.log( "msg byetes", offset, toHex( chunk.subarray( 0, offset ) ) );
                 // Error.stackTraceLimit = 0;
-                try {
+                try 
+                {
                     msg = chainSyncMessageFromCborObj( thing.parsed );
                     // @ts-ignore Cannot assign to 'cborBytes' because it is a read-only property.ts(2540)
                     msg.cborBytes = Uint8Array.prototype.slice.call( chunk, 0, offset );
                     
                     queque.unshift( msg );
                 }
-                catch (e)
+                catch( e )
                 {
                     // before dispatch event
                     Error.stackTraceLimit = originalSTLimit;
@@ -407,9 +160,10 @@ export class ChainSyncServer
                         "\ndata: " + toHex( chunk ) + "\n"
                     );
                     
-                    dispatchEvent("error", err );
+                    this.dispatchEvent( "error", err );
                 }
-                finally {
+                finally 
+                {
                     Error.stackTraceLimit = originalSTLimit;
                 }
 
@@ -426,60 +180,266 @@ export class ChainSyncServer
             while( msg = queque.pop()! )
             {
                 msgStr = msgToName( msg )!;
-                if( !msgStr ) continue; // ingore messages not expected by the client
+                if( !msgStr ) continue; // ingore messages not expected by the Server
 
-                dispatchEvent( msgStr, msg );
+                this.dispatchEvent( msgStr, msg );
             }
         });
 
-        this.on("requestNext", ( msg: ChainSyncRequestNext ) => {
-            // console.log("requestNext", msg);
-        });
-        this.on("findIntersect", ( msg: ChainSyncFindIntersect ) => this.handleFindIntersect( msg ) );
+        this.currentBlockNo = Number( this.chainDb.volatileDb.tip.blockNo );
 
-        this.on("done", ( msg: ChainSyncMessageDone ) => {});
+        this.on("requestNext", ( msg: ChainSyncRequestNext ) => this.handleRequestNext() );
+        this.on("findIntersect", ( msg: ChainSyncFindIntersect ) => this.handleFindIntersect( [...msg.points] ) );
+        this.on("done", ( msg: ChainSyncMessageDone ) => {} );
     }
 
-    clientBlockNo: number;
-
-    sendRollForward( point: IChainPoint ): void
+    hasEventListeners(): boolean 
     {
-        this.clientBlockNo = this.clientBlockNo + 1;
+        return( 
+            this._hasEventListeners( this.eventListeners )      || 
+            this._hasEventListeners( this.onceEventListeners )
+        );
+    }
+    private _hasEventListeners( listeners: ChainSyncServerEvtListeners ): boolean 
+    {
+        return (
+            listeners.requestNext.length    > 0     ||
+            listeners.findIntersect.length  > 0     ||
+            listeners.error.length          > 0
+        );
     }
 
-    sendRollBackwards( point: IChainPoint ): void
+    addEventListenerOnce<EvtName extends ChainSyncServerEvtName>( evt: EvtName, listener: EvtListenerOf<EvtName> ) : typeof self 
     {
-        this.clientBlockNo = this.clientBlockNo - nBlockBack;
+        if( !isAnyChainSyncServerEvtName( evt ) ) return self;
+
+        this.onceEventListeners[ evt ].push( listener as any );
+
+        return self;
     }
 
-    sendAwaitReply( point: IChainPoint ): void
+    once<EvtName extends ChainSyncServerEvtName>( evt: EvtName, listener: EvtListenerOf<EvtName> ): typeof self 
     {
-
+        return this.addEventListenerOnce( evt, listener );
     }
 
-    sendIntersectFound( point: IChainPoint ): void
+    addEventListener<EvtName extends ChainSyncServerEvtName>( evt: EvtName, listener: EvtListenerOf<EvtName>, options?: AddEvtListenerOpts ): typeof self 
     {
-        this.clientBlockNo = this.clientBlockNo - nBlockBack;
+        if( options?.once === true ) return this.addEventListenerOnce( evt, listener );
+            
+        if( !isAnyChainSyncServerEvtName( evt ) ) return self;
+        
+        this.eventListeners[ evt ].push( listener as any );
 
+        return self;
     }
 
-    sendIntersectNotFound( point: IChainPoint ): void
+    addListener( evt: ChainSyncServerEvtName, callback: ( data: any ) => void ): this
     {
+        return this.on( evt, callback );
+    }
+    on( evt: AnyChainSyncServerEvtName, callback: ( data: any ) => void ): this
+    {
+        const listeners = this.eventListeners[ evt ];
+        if( !listeners ) return this;
 
+        listeners.push( callback );
+        
+        return this;
     }
 
-    async handleFindIntersect( msg: ChainSyncFindIntersect ): Promise<void>
+    removeEventListener<EvtName extends ChainSyncServerEvtName>( evt: EvtName, listener: EvtListenerOf<EvtName> ): typeof self 
     {
-        const { a, b } = msg;
-        const intersect = await this.volatile.findIntersect( a, b );
+        if( !isAnyChainSyncServerEvtName( evt ) ) return self;
 
-        if( intersect )
+        this.eventListeners[evt] = this.eventListeners[evt].filter( fn => fn !== listener ) as any;
+        this.onceEventListeners[evt] = this.onceEventListeners[evt].filter( fn => fn !== listener ) as any;
+        
+        return self; 
+    }
+
+    removeListener( evt: ChainSyncServerEvtName, callback: ( data: any ) => void )
+    {
+        return this.off( evt, callback );
+    }
+    off( evt: ChainSyncServerEvtName, callback: ( data: any ) => void )
+    {
+        const listeners = this.eventListeners[ evt ];
+        if( !listeners ) return this;
+
+        const idx = listeners.findIndex(( cb ) => callback === cb );
+        if( idx < 0 ) return this;
+
+        void listeners.splice( idx, 1 );
+
+        return this;
+    }
+
+    emit<EvtName extends ChainSyncServerEvtName>( evt: EvtName, msg: MsgOf<EvtName> ): boolean
+    {
+        return this.dispatchEvent( evt, msg );
+    }
+    dispatchEvent( evt: AnyChainSyncServerEvtName, msg: ChainSyncMessage | Error ) : boolean
+    {
+        if( !isAnyChainSyncServerEvtName( evt ) ) return true;
+        if( evt !== "error" && !isChainSyncMessage( msg ) ) return true;
+
+        const listeners = this.eventListeners[ evt ];
+        const nListeners = listeners.length;
+        for(let i = 0; i < nListeners; i++)
         {
-            this.sendIntersectFound( intersect );
+            listeners[i](msg as any);
+        }
+
+        const onceListeners = this.onceEventListeners[evt];
+        while( onceListeners.length > 0 )
+        {
+            onceListeners.shift()!(msg as any);
+        }
+
+        return true;
+    }
+
+    removeAllListeners( event?: ChainSyncServerEvtName ): void
+    {
+        return this.clearListeners( event );
+    }
+    clearListeners( evt?: ChainSyncServerEvtName ) : void
+    {
+        this._clearListeners( this.eventListeners, evt );
+        this._clearListeners( this.onceEventListeners, evt );
+    }
+    private _clearListeners( listeners: ChainSyncServerEvtListeners, evt?: ChainSyncServerEvtName ) : void
+    {
+        if( isAnyChainSyncServerEvtName( evt ) )
+        {
+            listeners[ evt ] = [];
         }
         else
         {
-            this.sendIntersectNotFound( a );
+            for( const key in listeners )
+            {
+                if( listeners.hasOwnProperty(key) ) 
+                {
+                    listeners[key as ChainSyncServerEvtName] = [];
+                }
+            }
+        }
+    }
+
+    // chain-sync server messages implementation
+
+    private currentBlockNo: number;
+
+    handleRequestNext(): void
+    {
+        const point = this.chainDb.volatileDb.main[ this.currentBlockNo ];
+    }
+    replyAwaitReply( point: IChainPoint ): void
+    {
+        this.multiplexer.send(
+            new ChainSyncAwaitReply().toCbor().toBuffer(),
+            { 
+                hasAgency: true, 
+                protocol: MiniProtocol.ChainSync 
+            }
+        );
+    }
+    replyRollForward( point: IChainPoint ): void
+    {
+        this.updateCurrentBlockNo( -1 );
+
+        this.multiplexer.send(
+            new ChainSyncRollForward().toCbor().toBuffer(),
+            { 
+                hasAgency: true, 
+                protocol: MiniProtocol.ChainSync 
+            }
+        );
+    }
+    replyRollBackwards( point: IChainPoint ): void
+    {
+        this.updateCurrentBlockNo( +1 );
+
+        this.multiplexer.send(
+            new ChainSyncRollBackwards({
+                point: this.chainDb.volatileDb.hashToBlockData( ),
+                tip: this.chainDb.volatileDb.tip
+            }).toCbor().toBuffer(),
+            { 
+                hasAgency: true, 
+                protocol: MiniProtocol.ChainSync 
+            }
+        );
+    }
+
+    async handleFindIntersect( points: ChainPoint[] ): Promise<void>
+    {
+        // to be sure we order the points from higher to lower slotNumber
+        points.sort((a, b) => {
+            if (!b.blockHeader || !a.blockHeader) return 0;
+
+            const slotNumberA = typeof a.blockHeader.slotNumber === 'bigint' ? Number(a.blockHeader.slotNumber) : a.blockHeader.slotNumber;
+            const slotNumberB = typeof b.blockHeader.slotNumber === 'bigint' ? Number(b.blockHeader.slotNumber) : b.blockHeader.slotNumber;
+            
+            return slotNumberB - slotNumberA;
+        })
+        
+        // last generated point of the main chain (IChainDb handled)
+        const tip = this.chainDb.volatileDb.tip;
+
+        var pastBlockCounter = 0;
+        
+        for( const point of points )
+        {
+            var intersect = await this.chainDb.volatileDb.findIntersect( tip.point, point );
+            
+            if( intersect )
+            {
+                this.updateCurrentBlockNo( pastBlockCounter, intersect );
+
+                this.replyIntersectFound( intersect, tip );
+                break;
+            }
+
+            pastBlockCounter++;
+        }
+        
+        this.replyIntersectNotFound( tip );
+    }
+    replyIntersectFound( point: IChainPoint, tip: IChainTip ): void
+    {
+        this.multiplexer.send(
+            new ChainSyncIntersectFound({ point, tip }).toCbor().toBuffer(),
+            { 
+                hasAgency: true, 
+                protocol: MiniProtocol.ChainSync 
+            }
+        );
+    }
+    replyIntersectNotFound( tip: IChainTip ): void
+    {
+        this.multiplexer.send(
+            new ChainSyncIntersectNotFound({ tip }).toCbor().toBuffer(),
+            { 
+                hasAgency: true, 
+                protocol: MiniProtocol.ChainSync 
+            }
+        );
+    }
+
+    // pastBlockCounter is > 0 for rollBackwars and < 0 for rollForward
+    private updateCurrentBlockNo( pastBlockCounter: number, point?: IChainPoint ): void
+    {
+        if( point && point.blockHeader )
+        {
+            this.currentBlockNo = this.chainDb.volatileDb.hashToBlockData( point.blockHeader.hash ).blockNo;
+        }
+        else
+        {
+            // not a really nice solution but it works since every point is generated in sequence,
+            // slotNumber is incremental and points is ordered from higher to lower slotNumber
+            this.currentBlockNo = this.currentBlockNo - pastBlockCounter;
         }
     }
 }
