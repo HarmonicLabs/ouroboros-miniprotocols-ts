@@ -1,11 +1,11 @@
 import { ChainSyncAwaitReply, ChainSyncFindIntersect, ChainSyncIntersectFound, ChainSyncIntersectNotFound, ChainSyncMessageDone, ChainSyncRequestNext, ChainSyncRollBackwards, ChainSyncRollForward } from "./messages";
 import { ChainSyncMessage, isChainSyncMessage, chainSyncMessageFromCborObj } from "./ChainSyncMessage";
+import { Cbor, CborBytes, CborObj, CborTag } from "@harmoniclabs/cbor";
 import { AddEvtListenerOpts } from "../../common/AddEvtListenerOpts";
+import { ChainPoint, IChainPoint } from "../types/ChainPoint";
 import { Multiplexer } from "../../multiplexer/Multiplexer";
 import { toHex } from "@harmoniclabs/uint8array-utils";
-import { Cbor, CborBytes, CborObj, CborTag } from "@harmoniclabs/cbor";
 import { MiniProtocol } from "../../MiniProtocol";
-import { ChainPoint, IChainPoint } from "../types/ChainPoint";
 import { IChainDb } from "./interfaces/IChainDb";
 import { ChainTip, IChainTip } from "../types";
 
@@ -94,7 +94,9 @@ export class ChainSyncServer
         this.clientIndex = BigInt(0);
 
         this.tip = new ChainTip({ point: ChainPoint.origin, blockNo: 0 });
-        this.chainDb.getTip().then( tip => this.tip = new ChainTip( tip ) );
+        this.chainDb.getTip().then(( tip ) => { 
+            this.tip = new ChainTip( tip ) 
+        });
 
         this.prevIntersectPoint = undefined;
         this.synced = false;
@@ -184,15 +186,13 @@ export class ChainSyncServer
             }
         });
 
-        this.on("requestNext", ( msg: ChainSyncRequestNext ) => this.handleRequestNext() );
+        this.on("requestNext", ( msg: ChainSyncRequestNext ) => this.handleReqNext() );
         this.on("findIntersect", ( msg: ChainSyncFindIntersect ) => this.handleFindIntersect( [...msg.points] ) );
-        this.on("done", ( msg: ChainSyncMessageDone ) => {} );
+        this.on("done", ( msg: ChainSyncMessageDone ) => { console.log(" ciaone! ") } );
     }
 
     // chain-sync server messages implementation
     
-    
-
     async handleFindIntersect( points: ChainPoint[] ): Promise<void>
     {
         const intersection = await this.chainDb.findIntersect( ...points );
@@ -211,57 +211,6 @@ export class ChainSyncServer
         this.prevIntersectPoint = point;
         this.sendIntersectFound( point, tip );
     }
-    async handleReqNext(): Promise<void>
-    {
-        const tip = await this.chainDb.getTip();
-
-        if( this.prevIntersectPoint !== undefined )
-        {
-            const point = this.prevIntersectPoint;
-            this.prevIntersectPoint = undefined;
-            this.sendRollBackwards( point, tip );
-            return;
-        }
-
-        if( !ChainTip.eq( this.tip, tip ) )
-        {
-            const intersection = await this.chainDb.findIntersect( this.tip.point, tip.point );
-            if( !intersection ) throw new Error("expected intersection not found");
-            
-            this.clientIndex = BigInt( intersection.blockNo );
-
-            this.sendRollBackwards( intersection.point, tip );
-            return;
-        }
-
-        if( this.synced )
-        {
-            const self = this;
-            this.sendAwaitReply();
-
-            // we'll send either a "RollBackwards" or a "RollForward"
-            function handleExtend( newTip: IChainTip )
-            {
-                
-                self.chainDb.off("extend", handleExtend );
-            }
-
-            this.chainDb.on("extend", handleExtend );
-            return;
-        }
-
-        // we are following the same chain (no forks)
-        // and the client is not yet synced (is behind)
-
-        this.clientIndex++;
-        const nextClientBlock = this.chainDb.getBlockNo( this.clientIndex );
-
-        if( this.clientIndex === this.tip.blockNo ) this.synced = true;
-
-        this.sendRollForward( nextClientBlock, tip );
-        return;
-    }
-
     /**
      * @pure
      */
@@ -289,7 +238,81 @@ export class ChainSyncServer
         );
     }
 
+    async handleReqNext(): Promise<void>
+    {
+        const tip = await this.chainDb.getTip();
+
+        if( this.prevIntersectPoint !== undefined )
+        {
+            const point = this.prevIntersectPoint;
+            this.prevIntersectPoint = undefined;
+            this.sendRollBackwards( point, tip );
+            return;
+        }
+
+        if( !ChainTip.eq( this.tip, tip ) )
+        {
+            const intersection = await this.chainDb.findIntersect( this.tip.point, tip.point );
+            if( !intersection ) throw new Error("expected intersection not found");
+            
+            this.clientIndex = BigInt( intersection.blockNo );
+
+            this.sendRollBackwards( intersection.point, tip );
+            return;
+        }
+
+        const self = this;
+        
+        // we'll send either a "RollBackwards" or a "RollForward"
+        async function handleExtend( newTip: IChainTip )
+        {
+            
+            self.chainDb.off( "extend", handleExtend );
+
+            if( !ChainTip.eq( self.tip, newTip ) )
+            {
+                const intersection = await self.chainDb.findIntersect( self.tip.point, newTip.point );
+                if( !intersection ) throw new Error("expected intersection not found");
+                
+                self.clientIndex = BigInt( intersection.blockNo );
     
+                self.tip = new ChainTip( newTip );
+
+                self.sendRollBackwards( intersection.point, tip );
+                return;
+            }
+            else
+            {
+                self.clientIndex++;
+                const nextClientBlock = await self.chainDb.getBlockNo( self.clientIndex );
+
+                if( self.clientIndex === self.tip.blockNo ) self.synced = true;
+
+                self.sendRollForward( nextClientBlock, tip );
+                return;
+            }
+        }
+
+        if( this.synced )
+        {
+            this.sendAwaitReply();
+
+            this.chainDb.on( "extend", handleExtend );
+            return;
+        }
+
+        // we are following the same chain (no forks)
+        // and the client is not yet synced (is behind)
+
+        this.clientIndex++;
+        const nextClientBlock = await this.chainDb.getBlockNo( this.clientIndex );
+
+        if( this.clientIndex === this.tip.blockNo ) this.synced = true;
+
+        this.sendRollForward( nextClientBlock, tip );
+        return;
+    }
+
     sendAwaitReply(): void
     {
         this.multiplexer.send(
