@@ -6,7 +6,7 @@ import { ChainPoint, IChainPoint } from "../types/ChainPoint";
 import { Multiplexer } from "../../multiplexer/Multiplexer";
 import { toHex } from "@harmoniclabs/uint8array-utils";
 import { MiniProtocol } from "../../MiniProtocol";
-import { IChainDb } from "./interfaces/IChainDb";
+import { IChainDb, IExtendData } from "./interfaces/IChainDb";
 import { ChainTip, IChainTip } from "../types";
 
 type ChainSyncServerEvtName     = keyof Omit<ChainSyncServerEvtListeners, "error">;
@@ -262,12 +262,23 @@ export class ChainSyncServer
         }
 
         const self = this;
+
+        async function handleFork( extendData: IExtendData )
+        {
+            const { tip: newTip, intersection } = extendData;
+
+            self.chainDb.off( "extend", handleExtend );
+            self.chainDb.off( "fork"  , handleFork );
+            
+        }
         
         // we'll send either a "RollBackwards" or a "RollForward"
-        async function handleExtend( newTip: IChainTip )
+        async function handleExtend( extendData: IExtendData )
         {
-            
+            const { tip: newTip, intersection } = extendData;
+
             self.chainDb.off( "extend", handleExtend );
+            self.chainDb.off( "fork"  , handleFork );
 
             if( !ChainTip.eq( self.tip, newTip ) )
             {
@@ -295,9 +306,9 @@ export class ChainSyncServer
 
         if( this.synced )
         {
-            this.sendAwaitReply();
-
             this.chainDb.on( "extend", handleExtend );
+            this.chainDb.on( "fork"  , handleFork );
+            this.sendAwaitReply();
             return;
         }
 
