@@ -264,7 +264,6 @@ export class ChainSyncServer
 
         const self = this;
      
-        
         async function handleExtend( extendData: IExtendData )
         {
             const { tip: newTip, intersection } = extendData;
