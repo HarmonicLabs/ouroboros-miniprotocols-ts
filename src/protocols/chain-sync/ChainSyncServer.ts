@@ -206,7 +206,7 @@ export class ChainSyncServer
 
         const { point, blockNo } = new ChainTip( intersection );
 
-        this.clientIndex = BigInt(blockNo);
+        this.clientIndex = BigInt( blockNo );
 
         this.prevIntersectPoint = point;
         this.sendIntersectFound( point, tip );
@@ -256,54 +256,14 @@ export class ChainSyncServer
             if( !intersection ) throw new Error("expected intersection not found");
             
             this.clientIndex = BigInt( intersection.blockNo );
+            this.tip = new ChainTip( tip );
 
             this.sendRollBackwards( intersection.point, tip );
             return;
         }
 
         const self = this;
-
-        async function handleFork( extendData: IExtendData )
-        {
-            const { tip: newTip, intersection } = extendData;
-
-            self.chainDb.off( "extend", handleExtend );
-            self.chainDb.off( "fork"  , handleFork );
-            
-        }
-        
-        // we'll send either a "RollBackwards" or a "RollForward"
-        async function handleExtend( extendData: IExtendData )
-        {
-            const { tip: newTip, intersection } = extendData;
-
-            self.chainDb.off( "extend", handleExtend );
-            self.chainDb.off( "fork"  , handleFork );
-
-            if( !ChainTip.eq( self.tip, newTip ) )
-            {
-                const intersection = await self.chainDb.findIntersect( self.tip.point, newTip.point );
-                if( !intersection ) throw new Error("expected intersection not found");
-                
-                self.clientIndex = BigInt( intersection.blockNo );
-    
-                self.tip = new ChainTip( newTip );
-
-                self.sendRollBackwards( intersection.point, tip );
-                return;
-            }
-            else
-            {
-                self.clientIndex++;
-                const nextClientBlock = await self.chainDb.getBlockNo( self.clientIndex );
-
-                if( self.clientIndex === self.tip.blockNo ) self.synced = true;
-
-                self.sendRollForward( nextClientBlock, tip );
-                return;
-            }
-        }
-
+     
         if( this.synced )
         {
             this.chainDb.on( "extend", handleExtend );
@@ -311,14 +271,37 @@ export class ChainSyncServer
             this.sendAwaitReply();
             return;
         }
+        async function handleExtend( extendData: IExtendData )
+        {
+            const { tip: newTip, intersection } = extendData;
+
+            self.chainDb.off( "extend", handleExtend );
+            self.chainDb.off( "fork"  , handleFork );
+            
+            self.tip = new ChainTip( newTip );
+            self.synced = false;
+            
+            self.handleReqNext();
+        }
+        async function handleFork( extendData: IExtendData )
+        {
+            const { tip: newTip, intersection } = extendData;
+
+            self.chainDb.off( "extend", handleExtend );
+            self.chainDb.off( "fork"  , handleFork );
+
+            self.prevIntersectPoint = new ChainPoint( intersection );
+            self.tip = new ChainTip( newTip );
+            self.synced = false;
+
+            self.handleReqNext();
+        }
 
         // we are following the same chain (no forks)
         // and the client is not yet synced (is behind)
 
         this.clientIndex++;
         const nextClientBlock = await this.chainDb.getBlockNo( this.clientIndex );
-
-        if( this.clientIndex === this.tip.blockNo ) this.synced = true;
 
         this.sendRollForward( nextClientBlock, tip );
         return;
@@ -336,7 +319,8 @@ export class ChainSyncServer
     }
     async sendRollBackwards( rollbackPoint: IChainPoint, tip?: IChainTip ): Promise<void>
     {
-        this.synced = false;
+        if( this.clientIndex === this.tip.blockNo ) this.synced = true;
+
         this.multiplexer.send(
             new ChainSyncRollBackwards({ 
                 point: rollbackPoint, 
@@ -350,7 +334,8 @@ export class ChainSyncServer
     }
     async sendRollForward( data: Uint8Array, tip?: IChainTip ): Promise<void>
     {
-        this.synced = false;
+        if( this.clientIndex === this.tip.blockNo ) this.synced = true;
+
         this.multiplexer.send(
             new ChainSyncRollForward({ 
                 data: new CborTag(24, new CborBytes( data )),
