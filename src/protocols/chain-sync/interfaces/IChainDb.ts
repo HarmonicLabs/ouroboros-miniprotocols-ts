@@ -14,5 +14,5 @@ export interface IChainDb
 export interface IExtendData
 {
     tip: IChainTip;
-    intersection: IChainPoint;
+    intersection: IChainTip;
 }

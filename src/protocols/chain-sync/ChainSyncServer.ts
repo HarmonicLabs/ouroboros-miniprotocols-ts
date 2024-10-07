@@ -264,13 +264,7 @@ export class ChainSyncServer
 
         const self = this;
      
-        if( this.synced )
-        {
-            this.chainDb.on( "extend", handleExtend );
-            this.chainDb.on( "fork"  , handleFork );
-            this.sendAwaitReply();
-            return;
-        }
+        
         async function handleExtend( extendData: IExtendData )
         {
             const { tip: newTip, intersection } = extendData;
@@ -278,10 +272,15 @@ export class ChainSyncServer
             self.chainDb.off( "extend", handleExtend );
             self.chainDb.off( "fork"  , handleFork );
             
+            self.synced = ChainPoint.eq( self.tip.point, intersection.point );
             self.tip = new ChainTip( newTip );
-            self.synced = false;
             
-            self.handleReqNext();
+            self.clientIndex++;
+            self.sendRollForward(
+                await self.chainDb.getBlockNo( self.clientIndex ),
+                self.tip
+            );
+            return;
         }
         async function handleFork( extendData: IExtendData )
         {
@@ -290,11 +289,20 @@ export class ChainSyncServer
             self.chainDb.off( "extend", handleExtend );
             self.chainDb.off( "fork"  , handleFork );
 
-            self.prevIntersectPoint = new ChainPoint( intersection );
             self.tip = new ChainTip( newTip );
             self.synced = false;
 
-            self.handleReqNext();
+            self.clientIndex = BigInt( intersection.blockNo );
+
+            self.sendRollBackwards( intersection.point, tip );
+            return;
+        }
+        if( this.synced )
+        {
+            this.chainDb.on( "extend", handleExtend );
+            this.chainDb.on( "fork"  , handleFork );
+            this.sendAwaitReply();
+            return;
         }
 
         // we are following the same chain (no forks)
@@ -319,7 +327,7 @@ export class ChainSyncServer
     }
     async sendRollBackwards( rollbackPoint: IChainPoint, tip?: IChainTip ): Promise<void>
     {
-        if( this.clientIndex === this.tip.blockNo ) this.synced = true;
+        this.synced = false;
 
         this.multiplexer.send(
             new ChainSyncRollBackwards({ 
