@@ -1,4 +1,4 @@
-import { IChainPoint, IChainTip, RealPoint } from "../../types";
+import { ChainPoint, IChainPoint, IChainTip } from "../types";
 export interface IChainDb 
 {
     /**
@@ -7,6 +7,12 @@ export interface IChainDb
     findIntersect( ...point: IChainPoint[] ): Promise<IChainTip | undefined>;
     getBlockNo( blockIndex: bigint ): Promise<Uint8Array>;
     getTip(): Promise<IChainTip>;
+
+    /**
+     * @returns {ChainPoint[]} if blocks are present between the range
+     */
+    getBlocksBetweenRange( from: ChainPoint, to: ChainPoint ): Promise<ChainPoint[]>;
+
     on(  evtName: "extend" | "fork", cb : ( tip: IExtendData ) => any ): void;
     off( evtName: "extend" | "fork", cb?: ( tip: IExtendData ) => any ): void;
 }
