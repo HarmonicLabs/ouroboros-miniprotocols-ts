@@ -1,11 +1,12 @@
+import { BlockFetchBatchDone, BlockFetchBlock, BlockFetchClientDone, BlockFetchNoBlocks, BlockFetchRequestRange, BlockFetchStartBatch } from "./messages";
 import { BlockFetchMessage, blockFetchMessageFromCborObj, isBlockFetchMessage } from "./BlockFetchMessage";
-import { BlockFetchClientDone, BlockFetchNoBlocks, BlockFetchRequestRange } from "./messages";
 import { AddEvtListenerOpts } from "../../common/AddEvtListenerOpts";
 import { toHex } from "@harmoniclabs/uint8array-utils";
 import { CborObj, Cbor } from "@harmoniclabs/cbor";
 import { MiniProtocol } from "../../MiniProtocol";
 import { IChainDb } from "../interfaces/IChainDb";
 import { Multiplexer } from "../../multiplexer";
+import { ChainPoint } from "../types";
 
 type BlockFetchServerEvtName     = keyof Omit<BlockFetchServerEvtListeners, "error">;
 type AnyBlockFetchServerEvtName  = BlockFetchServerEvtName | "error";
@@ -75,7 +76,7 @@ export class BlockFetchServer
         this.multiplexer = thisMultiplexer;
         this.chainDb = thisChainDb;
 
-        // handle muliplexer messages s
+        // handle muliplexer messages
         let prevBytes: Uint8Array | undefined = undefined;
         const queque: BlockFetchMessage[] = [];
 
@@ -160,20 +161,69 @@ export class BlockFetchServer
             }
         });
 
-        this.on( "requestRange", ( msg: BlockFetchNoBlocks ) => this.handleRequestRange() );
-        this.on( "done", ( msg: BlockFetchClientDone ) => this.handleDone() );
+        this.on( "requestRange", ( msg: BlockFetchRequestRange ) => this.handleRequestRange( msg.from, msg.to ) );
+        this.on( "done", ( msg: BlockFetchClientDone ) => this.handleClientDone() );
     }
 
     // block-fetch Server messages implementation
     
-    private handleRequestRange()
+    sendNoBlocks()
     {
-        // console.log( "requestRange" );
+        this.multiplexer.send(
+            new BlockFetchNoBlocks().toCbor().toBuffer(),
+            { 
+                hasAgency: true, 
+                protocol: MiniProtocol.BlockFetch 
+            }
+        );
+    }
+    sendStartBatch()
+    {
+        this.multiplexer.send(
+            new BlockFetchStartBatch().toCbor().toBuffer(),
+            { 
+                hasAgency: true, 
+                protocol: MiniProtocol.BlockFetch 
+            }
+        );
+    }
+    sendBatchDone()
+    {
+        this.multiplexer.send(
+            new BlockFetchBatchDone().toCbor().toBuffer(),
+            { 
+                hasAgency: true, 
+                protocol: MiniProtocol.BlockFetch 
+            }
+        );
+    }
+    async handleRequestRange( from: ChainPoint, to: ChainPoint )
+    {
+        const blocksBetween = await this.chainDb.getBlocksBetweenRange( from, to );
+
+        if( !blocksBetween ) this.sendNoBlocks();
+        else this.sendStartBatch();
+
+        for( const block of blocksBetween )
+        {
+            this.multiplexer.send(
+                new BlockFetchBlock({ blockCbor: block.toCbor().toBuffer() }).toCbor().toBuffer(),
+                { 
+                    hasAgency: true, 
+                    protocol: MiniProtocol.BlockFetch 
+                }
+            );
+        }
+
+        this.sendBatchDone();
     }
 
-    private handleDone()
+    handleClientDone()
     {
-        // console.log( "done" );
+        this.removeListener( "requestRange", ( msg: BlockFetchRequestRange ) => this.handleRequestRange( msg.from, msg.to ) );
+        this.removeListener( "done", ( msg: BlockFetchClientDone ) => this.handleClientDone() );
+
+        console.log( "closing connection with block-fetch client" );
     }
 
     // event listeners
