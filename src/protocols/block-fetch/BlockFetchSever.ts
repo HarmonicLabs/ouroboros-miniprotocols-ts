@@ -220,8 +220,7 @@ export class BlockFetchServer
 
     handleClientDone()
     {
-        this.removeListener( "requestRange", ( msg: BlockFetchRequestRange ) => this.handleRequestRange( msg.from, msg.to ) );
-        this.removeListener( "done", ( msg: BlockFetchClientDone ) => this.handleClientDone() );
+        this.removeAllListeners();
 
         console.log( "closing connection with block-fetch client" );
     }

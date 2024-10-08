@@ -357,9 +357,7 @@ export class ChainSyncServer
 
     handleClientDone(): void
     {
-        this.removeListener( "requestNext", ( msg: ChainSyncRequestNext ) => this.handleReqNext() );
-        this.removeListener("findIntersect", ( msg: ChainSyncFindIntersect ) => this.handleFindIntersect( [...msg.points] ) );
-        this.removeListener("done", ( msg: ChainSyncMessageDone ) => { this.handleClientDone() } );
+        this.removeAllListeners();
 
         console.log( "closing connection with chain-sync client" );
     }
