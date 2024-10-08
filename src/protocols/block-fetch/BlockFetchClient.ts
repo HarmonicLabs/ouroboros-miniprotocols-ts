@@ -1,9 +1,8 @@
 import { BlockFetchBatchDone, BlockFetchBlock, BlockFetchNoBlocks, BlockFetchStartBatch } from "./messages";
 import { BlockFetchMessage, blockFetchMessageFromCborObj, isBlockFetchMessage } from "./BlockFetchMessage";
-import { IChainDb, IExtendData } from "../chain-sync/interfaces/IChainDb";
-import { CborObj, Cbor, CborTag, CborBytes } from "@harmoniclabs/cbor";
 import { AddEvtListenerOpts } from "../../common/AddEvtListenerOpts";
 import { toHex } from "@harmoniclabs/uint8array-utils";
+import { CborObj, Cbor } from "@harmoniclabs/cbor";
 import { MiniProtocol } from "../../MiniProtocol";
 import { Multiplexer } from "../../multiplexer";
 
@@ -64,7 +63,6 @@ type EvtListenerOf<EvtName extends AnyBlockFetchClientEvtName> =
 export class BlockFetchClient
 {
     readonly multiplexer: Multiplexer;
-    readonly chainDb: IChainDb;
 
     private eventListeners: BlockFetchClientEvtListeners = Object.freeze({
         noBlocks:        [],
@@ -82,9 +80,7 @@ export class BlockFetchClient
         error:           []
     });
     
-    constructor(
-        thisMultiplexer: Multiplexer
-    )
+    constructor( thisMultiplexer: Multiplexer )
     {
         this.multiplexer = thisMultiplexer;
 
