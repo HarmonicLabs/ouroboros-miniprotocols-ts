@@ -1,10 +1,10 @@
 import { BlockFetchMessage, blockFetchMessageFromCborObj, isBlockFetchMessage } from "./BlockFetchMessage";
 import { BlockFetchClientDone, BlockFetchNoBlocks, BlockFetchRequestRange } from "./messages";
 import { AddEvtListenerOpts } from "../../common/AddEvtListenerOpts";
-import { IChainDb } from "../chain-sync/interfaces/IChainDb";
 import { toHex } from "@harmoniclabs/uint8array-utils";
 import { CborObj, Cbor } from "@harmoniclabs/cbor";
 import { MiniProtocol } from "../../MiniProtocol";
+import { IChainDb } from "../interfaces/IChainDb";
 import { Multiplexer } from "../../multiplexer";
 
 type BlockFetchServerEvtName     = keyof Omit<BlockFetchServerEvtListeners, "error">;

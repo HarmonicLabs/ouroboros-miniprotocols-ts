@@ -2,11 +2,11 @@ import { ChainSyncAwaitReply, ChainSyncFindIntersect, ChainSyncIntersectFound, C
 import { ChainSyncMessage, isChainSyncMessage, chainSyncMessageFromCborObj } from "./ChainSyncMessage";
 import { Cbor, CborBytes, CborObj, CborTag } from "@harmoniclabs/cbor";
 import { AddEvtListenerOpts } from "../../common/AddEvtListenerOpts";
+import { IChainDb, IExtendData } from "../interfaces/IChainDb";
 import { ChainPoint, IChainPoint } from "../types/ChainPoint";
 import { Multiplexer } from "../../multiplexer/Multiplexer";
 import { toHex } from "@harmoniclabs/uint8array-utils";
 import { MiniProtocol } from "../../MiniProtocol";
-import { IChainDb, IExtendData } from "./interfaces/IChainDb";
 import { ChainTip, IChainTip } from "../types";
 
 type ChainSyncServerEvtName     = keyof Omit<ChainSyncServerEvtListeners, "error">;
