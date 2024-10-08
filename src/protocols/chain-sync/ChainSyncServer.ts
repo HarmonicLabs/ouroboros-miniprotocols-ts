@@ -188,7 +188,7 @@ export class ChainSyncServer
 
         this.on("requestNext", ( msg: ChainSyncRequestNext ) => this.handleReqNext() );
         this.on("findIntersect", ( msg: ChainSyncFindIntersect ) => this.handleFindIntersect( [...msg.points] ) );
-        this.on("done", ( msg: ChainSyncMessageDone ) => { console.log(" ciaone! ") } );
+        this.on("done", ( msg: ChainSyncMessageDone ) => { this.handleClientDone() } );
     }
 
     // chain-sync server messages implementation
@@ -353,6 +353,15 @@ export class ChainSyncServer
                 protocol: MiniProtocol.ChainSync 
             }
         );
+    }
+
+    handleClientDone(): void
+    {
+        this.removeListener( "requestNext", ( msg: ChainSyncRequestNext ) => this.handleReqNext() );
+        this.removeListener("findIntersect", ( msg: ChainSyncFindIntersect ) => this.handleFindIntersect( [...msg.points] ) );
+        this.removeListener("done", ( msg: ChainSyncMessageDone ) => { this.handleClientDone() } );
+
+        console.log( "closing connection with chain-sync client" );
     }
 
     // event listeners
