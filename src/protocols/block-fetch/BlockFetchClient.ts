@@ -1,8 +1,10 @@
-import { BlockFetchBatchDone, BlockFetchBlock, BlockFetchNoBlocks, BlockFetchStartBatch } from "./messages";
+import { BlockFetchBatchDone, BlockFetchBlock, BlockFetchClientDone, BlockFetchNoBlocks, BlockFetchStartBatch } from "./messages";
 import { BlockFetchMessage, blockFetchMessageFromCborObj, isBlockFetchMessage } from "./BlockFetchMessage";
 import { AddEvtListenerOpts } from "../../common/AddEvtListenerOpts";
 import { toHex } from "@harmoniclabs/uint8array-utils";
 import { CborObj, Cbor } from "@harmoniclabs/cbor";
+import { ChainPoint, IChainPoint } from "../types";
+import { BlockAck } from "./interfaces/IBlockAck";
 import { MiniProtocol } from "../../MiniProtocol";
 import { Multiplexer } from "../../multiplexer";
 
@@ -169,32 +171,76 @@ export class BlockFetchClient
             }
         });
 
-        this.on( "noBlocks", ( msg: BlockFetchNoBlocks ) => this.handleNoBlocks() );
-        this.on( "startBatch", ( msg: BlockFetchStartBatch ) => this.handleStartBatch() );
-        this.on( "block", ( msg: BlockFetchBlock ) => this.handleBlock( msg ) );
-        this.on( "batchDone", ( msg: BlockFetchBatchDone ) => this.handleBatchDone() );
+        this.batching = false;
+        this.requestedBlocks = [];
+
+        this.on( "noBlocks", ( ) => this.handleNoBlocks() );
+        this.on( "startBatch", ( ) => this.handleStartBatch() );
+        this.on( "block", async ( msg: Uint8Array ) => await this.handleBlock( msg ) );
+        this.on( "batchDone", ( ) => this.handleBatchDone() );
     }
 
     // block-fetch Client messages implementation
+
+    private batching: boolean;
+    private requestedBlocks: IChainPoint[];
     
+    sendClientDone()
+    {
+        console.log( "closing connection with block-fetch server..." );
+                
+        this.multiplexer.send(
+            new BlockFetchClientDone().toCbor().toBuffer(),
+            { 
+                hasAgency: true, 
+                protocol: MiniProtocol.BlockFetch 
+            }
+        );
+        
+        this.removeAllListeners();
+
+        console.log( "connection closed." );
+    }
     private handleNoBlocks()
     {
-        // console.log( "noBlocks" );
+        console.log( "no blocks found." );
+
+        this.sendClientDone();
+    }
+    private handleBatchDone()
+    {
+        console.log( "blocks batching ended succesfully." );
+
+        this.batching = false;
+
+        this.sendClientDone();
     }
 
     private handleStartBatch()
     {
-        // console.log( "startBatch" );
+        console.log( "blocks found. blocks batching started..." );
+
+        this.batching = true;
     }
 
-    private handleBlock( msg: BlockFetchBlock )
+    private handleBlock( msg: Uint8Array )
     {
-        // console.log( "block", msg.block );
-    }
+        if( !this.batching ) throw new Error( "unexpected block message" );
+        
+        var newBlock: IChainPoint;
+        newBlock = ChainPoint.fromCbor( msg ) as IChainPoint;
 
-    private handleBatchDone()
-    {
-        // console.log( "batchDone" );
+        this.requestedBlocks.push( newBlock );
+        
+        console.log( "sending block acknowledgment..." );
+
+        this.multiplexer.send(
+            new BlockAck( newBlock.blockHeader?.slotNumber ?? -1 ).toCbor().toBuffer(),
+            {
+                hasAgency: true,
+                protocol: MiniProtocol.BlockFetch
+            }
+        );
     }
 
     // event listeners
