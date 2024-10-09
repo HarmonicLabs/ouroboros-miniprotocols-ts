@@ -357,9 +357,11 @@ export class ChainSyncServer
 
     handleClientDone(): void
     {
+        console.log( "closing connection with chain-sync client..." );
+
         this.removeAllListeners();
 
-        console.log( "closing connection with chain-sync client" );
+        console.log( "connection closed." );
     }
 
     // event listeners
