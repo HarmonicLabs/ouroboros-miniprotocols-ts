@@ -176,7 +176,7 @@ export class BlockFetchClient
 
         this.on( "noBlocks", ( ) => this.handleNoBlocks() );
         this.on( "startBatch", ( ) => this.handleStartBatch() );
-        this.on( "block", async ( msg: Uint8Array ) => await this.handleBlock( msg ) );
+        this.on( "block", ( msg: Uint8Array ) => this.handleBlock( msg ) );
         this.on( "batchDone", ( ) => this.handleBatchDone() );
     }
 
