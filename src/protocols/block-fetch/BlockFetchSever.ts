@@ -244,11 +244,7 @@ export class BlockFetchServer
 
     handleClientDone()
     {
-        console.log( "closing connection with block-fetch client..." );
-
         this.removeAllListeners();
-
-        console.log( "connection closed." );
     }
 
     // event listeners

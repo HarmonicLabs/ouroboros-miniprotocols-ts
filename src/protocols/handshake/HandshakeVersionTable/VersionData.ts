@@ -184,7 +184,6 @@ export class VersionData
     }
     static fromCborObj( cbor: CborObj, n2n: boolean = true ): VersionData
     {
-        console.log("VersionData.fromCborObj", cbor.toRawObj());
         if(!(
             cbor instanceof CborArray &&
             cbor.array.length >= 2 &&

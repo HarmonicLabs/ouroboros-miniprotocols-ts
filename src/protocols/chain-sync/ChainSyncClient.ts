@@ -305,7 +305,6 @@ export class ChainSyncClient
 
         function dispatchEvent( evt: AnyChainSyncClientEvtName, msg: ChainSyncMessage | Error ): boolean
         {
-            // console.log( evt, msg );
             if( !isAnyChainSyncClientEvtName( evt ) ) return true;
             if( evt !== "error" && !isChainSyncMessage( msg ) ) return true;
 

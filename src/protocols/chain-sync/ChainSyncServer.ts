@@ -357,11 +357,7 @@ export class ChainSyncServer
 
     handleClientDone(): void
     {
-        console.log( "closing connection with chain-sync client..." );
-
         this.removeAllListeners();
-
-        console.log( "connection closed." );
     }
 
     // event listeners
@@ -470,7 +466,7 @@ export class ChainSyncServer
         {
             throw msg instanceof Error ? msg : new Error( "Unhandled error: " + msg );
         }
-        
+
         while( onceListeners.length > 0 )
         {
             onceListeners.shift()!(msg as any);

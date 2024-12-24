@@ -107,7 +107,6 @@ export class HandshakeClient
         const queque: HandshakeMessage[] = [];
 
         this._mplexerListener = (chunk: Uint8Array) => {
-            console.log( "HandshakeClient::_mplexerListener has event listeners: ", self.hasEventListeners() );
             if( !self.hasEventListeners() ) return;
 
             let offset: number = -1;
@@ -120,7 +119,6 @@ export class HandshakeClient
 
             if( prevBytes )
             {
-                console.log("prevBytes");
                 const tmp = new Uint8Array( prevBytes.length + chunk.length );
                 tmp.set( prevBytes, 0 );
                 tmp.set( chunk, prevBytes.length );
@@ -137,7 +135,6 @@ export class HandshakeClient
                 }
                 catch
                 {
-                    console.log("fail parse")
                     Error.stackTraceLimit = originalSTLimit;
                     // assume the error is of "missing bytes";
                     prevBytes = Uint8Array.prototype.slice.call( chunk );
@@ -159,7 +156,6 @@ export class HandshakeClient
                 }
                 catch (e)
                 {
-                    console.log("fail message creation")
                     // before dispatch event
                     Error.stackTraceLimit = originalSTLimit;
 
@@ -188,7 +184,6 @@ export class HandshakeClient
                 }
             }
 
-            console.log({ queque });
             let msgStr: HandshakeClientEvtName;
             while( msg = queque.pop()! )
             {
