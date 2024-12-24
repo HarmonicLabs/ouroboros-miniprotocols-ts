@@ -231,21 +231,21 @@ export class HandshakeClient
         });
     }
 
-    private readonly _listeners: HandshakeClientEvtListeners = Object.freeze({
+    private readonly _listeners: HandshakeClientEvtListeners = {
         propose     : [],
         accept      : [],
         refuse      : [],
         queryReply  : [],
         error       : []
-    });
+    };
 
-    private readonly _onceListeners: HandshakeClientEvtListeners = Object.freeze({
+    private readonly _onceListeners: HandshakeClientEvtListeners = {
         propose     : [],
         accept      : [],
         refuse      : [],
         queryReply  : [],
         error       : []
-    });
+    };
 
     hasEventListeners( includeError: boolean = false ): boolean
     {
