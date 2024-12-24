@@ -4,7 +4,7 @@ import { canBeUInteger, forceBigUInt, forceUInteger } from "../../types/ints";
 
 export interface ITxIdAndSize {
     txId: Uint8Array,
-    txSize: number | bigint
+    txSize: number
 }
 
 export function isITxIdAndSize( stuff: any ): stuff is ITxIdAndSize
@@ -35,7 +35,7 @@ export function txIdAndSizeFromCborObj( cbor: CborObj ): ITxIdAndSize
 
     return {
         txId: cbor.array[0].buffer,
-        txSize: cbor.array[1].num
+        txSize: Number( cbor.array[1].num )
     };
 }
 

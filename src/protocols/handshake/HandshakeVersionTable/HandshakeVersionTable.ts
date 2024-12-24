@@ -39,7 +39,7 @@ export function getSortedVersions( versionTable: IVersionTableMap | VersionTable
 {
     return Object.keys( versionTable )
     .map( safeParseInt ) 
-    .filter<number>( v => v !== undefined )
+    .filter<number>( ((v => typeof v === "number") as (v: any) => v is number) )
     .map( VersionNumber )
     .sort( (a, b) => a - b );
 }

@@ -21,14 +21,7 @@ export class TxSubmitReplyTxs
     {
         if(!isITxSubmitReplyTx({ txs })) throw new Error("invalid interface for 'TxSubmitReplyTx'");
 
-        Object.defineProperty(
-            this, "txs", {
-                value: Object.freeze( txs.slice() ),
-                writable: false,
-                enumerable: true,
-                configurable: false
-            }
-        );
+        this.txs = txs;
     }
 
     toCbor(): CborString

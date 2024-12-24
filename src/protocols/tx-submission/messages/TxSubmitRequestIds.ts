@@ -26,38 +26,27 @@ export function isITxSubmitRequestIds( stuff: any ): stuff is TxSubmitRequestIds
 export class TxSubmitRequestIds
     implements ToCbor, ToCborObj, ITxSubmitRequestIds
 {
-    private readonly _blocking: boolean;
-    get blocking(): boolean { 
-        return this._blocking;
-    }
-
-    private readonly _knownTxCount: number;
-    get knownTxCount(): number {
-        return this._knownTxCount;
-    }
-
-    private readonly _requestedTxCount: number;
-    get requestedTxCount(): number {
-        return this._requestedTxCount;
-    }
+    readonly blocking: boolean;
+    readonly knownTxCount: number;
+    readonly requestedTxCount: number;
     
-    constructor(
-        { 
-            blocking, 
-            knownTxCount, 
-            requestedTxCount 
-        }
-        : ITxSubmitRequestIds 
-    )
+    constructor({ 
+        blocking,
+        knownTxCount,
+        requestedTxCount
+    }: ITxSubmitRequestIds)
     {
-        assert( 
-            isITxSubmitRequestIds( { blocking, knownTxCount, requestedTxCount } ),
-            "invalid TxSubmitRequestIds message"
-        );
+        if(
+            !isITxSubmitRequestIds({
+                blocking,
+                knownTxCount,
+                requestedTxCount
+            })
+        ) throw new Error( "invalid TxSubmitRequestIds" );
         
-        this._blocking = Boolean( blocking );
-        this._knownTxCount = forceUInteger( knownTxCount );
-        this._requestedTxCount = forceUInteger( requestedTxCount );
+        this.blocking = Boolean( blocking );
+        this.knownTxCount = forceUInteger( knownTxCount );
+        this.requestedTxCount = forceUInteger( requestedTxCount );
     }
 
     toCbor(): CborString

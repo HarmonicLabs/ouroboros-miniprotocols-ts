@@ -4,7 +4,7 @@ import { assert } from "../../utils/assert";
 
 export interface ITxSubmitRequestTxs 
 {
-    ids: Uint8Array[] | readonly Uint8Array[]
+    ids: Uint8Array[]
 }
 
 export function isITxSubmitRequestTxs( stuff: any ): stuff is ITxSubmitRequestTxs
@@ -22,16 +22,13 @@ export function isITxSubmitRequestTxs( stuff: any ): stuff is ITxSubmitRequestTx
 export class TxSubmitRequestTxs
     implements ToCbor, ToCborObj, ITxSubmitRequestTxs
 {
-    private readonly _ids: readonly Uint8Array[];
-    get ids(): readonly Uint8Array[] {
-        return this._ids;
-    }
+    readonly ids: Uint8Array[];
 
-    constructor( { ids }: ITxSubmitRequestTxs )
+    constructor({ ids }: ITxSubmitRequestTxs)
     {
         assert(!isITxSubmitRequestTxs({ ids }), "invalid interface for 'TxSubmitRequestTxs'" );
 
-        this._ids = Object.freeze( ids.slice() );
+        this.ids = ids;
     }
 
     toCbor(): CborString

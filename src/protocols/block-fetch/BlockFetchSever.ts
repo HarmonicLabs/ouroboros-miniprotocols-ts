@@ -210,7 +210,7 @@ export class BlockFetchServer
         if( !blocksBetween ) return this.sendNoBlocks();
         else await this.sendStartBatch();
 
-        var blockSlotNo: number | bigint;
+        let blockSlotNo: number | bigint;
 
         for( const block of blocksBetween )
         {

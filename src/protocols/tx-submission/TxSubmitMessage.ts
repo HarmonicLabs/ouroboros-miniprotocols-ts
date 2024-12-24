@@ -23,7 +23,7 @@ export type ITxSubmitMessage
     | ITxSubmitReplyTxs
     | ITxSubmitDone;
 
-export function isLocalTxSubmitMessage( stuff: any ): stuff is TxSubmitMessage {
+export function isTxSubmitMessage( stuff: any ): stuff is TxSubmitMessage {
     return isObject( stuff ) && (
         stuff instanceof TxSubmitInit       ||
         stuff instanceof TxSubmitRequestIds ||

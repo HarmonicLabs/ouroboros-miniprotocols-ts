@@ -244,11 +244,7 @@ export class LocalTxSubmitClient
                 msgStr = msgToName( msg )!;
                 if( !msgStr ) continue; // ingore messages not expected by the client
 
-                const listeners = eventListeners[ msgStr ];
-                for( const cb of listeners )
-                {
-                    void cb( msg );
-                }
+                self.dispatchEvent( msgStr, msg );
             }
 
         });
