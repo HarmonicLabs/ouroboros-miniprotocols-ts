@@ -250,6 +250,11 @@ export function wrapSocket(
     reconnect: ( this: SocketLike ) => SocketLike
 ): WrappedSocket
 {
+    const _evts: { [key: string]: any } = {};
+    function reconnectSocket()
+    {
+        const socket = reconnect.call( socketLike );
+    }
     if( isWebSocketLike( socketLike ) )
     {
         const socket: WrappedSocket = {
@@ -346,5 +351,6 @@ export function wrapSocket(
 
         return Object.freeze( socket );
     }
-    else throw new Error("cannot wrap " + socketLike + " as a socket because it doesn't meet the 'SocketLike' interface");
+    
+    throw new Error("cannot wrap " + socketLike + " as a socket because it doesn't meet the 'SocketLike' interface");
 }

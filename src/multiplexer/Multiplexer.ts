@@ -2,8 +2,10 @@ import { toHex } from "@harmoniclabs/uint8array-utils";
 import { MiniProtocol, MiniProtocolNum, MiniProtocolStr, isMiniProtocol, isMiniProtocolNum, isMiniProtocolStr, miniProtocolToNumber, miniProtocolToString } from "../MiniProtocol";
 import { SocketLike, WrappedSocket, isNode2NodeSocket, isWebSocketLike, wrapSocket } from "./SocketLike";
 import { MultiplexerHeader, MultiplexerHeaderInfos, MultiplexerMessage, unwrapMultiplexerMessages, wrapMultiplexerMessage } from "./multiplexerMessage";
-import { ErrorListener } from "../common/ErrorListener";
+import { DataListener, ErrorListener } from "../common/ErrorListener";
 import { AddEvtListenerOpts } from "../common/AddEvtListenerOpts";
+import { isObject } from "@harmoniclabs/obj-utils";
+import { get } from "http";
 
 const MAX_RECONNECT_ATTEPMTS = 3 as const;
 
@@ -26,14 +28,18 @@ type MultiplexerEvtListeners = {
     [MiniProtocol.TxSubmission]: MultiplexerEvtListener[]
     [MiniProtocol.LocalTxMonitor]: MultiplexerEvtListener[],
     [MiniProtocol.PeerSharing]: MultiplexerEvtListener[]
-    error: (( err: Error ) => void)[]
+    error: (( err: Error ) => void)[],
+    data: (( data: Uint8Array ) => void)[],
+    send: (( payload: Uint8Array, headerInfos: MultiplexerHeaderInfos) => void)[]
 };
 
 export type MultiplexerProtocolType = "node-to-node" | "node-to-client";
 
 export interface MultiplexerConfig {
     protocolType: MultiplexerProtocolType,
-    connect: () => SocketLike
+    connect: () => SocketLike,
+    initialListeners?: Partial<MultiplexerEvtListeners>,
+    initialOnceListeners?: Partial<MultiplexerEvtListeners>,
 }
 
 export type MultiplexerCloseOptions = {
@@ -43,12 +49,14 @@ export type MultiplexerCloseOptions = {
     closeSocket: boolean
 }
 
-export type MplexerEvtName = "error" | MiniProtocol | MiniProtocolStr | MiniProtocolNum;
+export type MplexerEvtName = "error" | "data" | "send" | MiniProtocol | MiniProtocolStr | MiniProtocolNum;
 
 export function isMplexerEvtName( thing: any ): thing is MplexerEvtName
 {
     return (
         thing === "error" ||
+        thing === "data" ||
+        thing === "send" ||
         isMiniProtocolStr( thing ) ||
         isMiniProtocolNum( thing )
     )
@@ -58,10 +66,14 @@ export type AnyMplexerListener = MultiplexerEvtListener | ErrorListener
 
 export type MplexerListenerOf<Evt extends MplexerEvtName> = 
     Evt extends "error" ? ErrorListener :
+    Evt extends "data" ? DataListener :
+    Evt extends "send" ? DataListener :
     MultiplexerEvtListener;
 
 export type ArgsOf<Evt extends MplexerEvtName> = 
     Evt extends "error" ? [ err: Error ] :
+    Evt extends "data" ? [ data: Uint8Array ] :
+    Evt extends "send" ? [ payload: Uint8Array, header: MultiplexerHeaderInfos ] :
     [ payload: Uint8Array, header: MultiplexerHeader ];
 
 export class Multiplexer
@@ -89,7 +101,7 @@ export class Multiplexer
 
     constructor( cfg: MultiplexerConfig )
     {
-        const self = this
+        const self = this;
         const reconnect = cfg.connect;
         const socketLike = reconnect();
         let socket = wrapSocket( socketLike, reconnect );
@@ -101,16 +113,23 @@ export class Multiplexer
             {
                 socket = wrapSocket( socket.reconnect(), reconnect );
             }
+            socket.on("close", reconnectSocket );
+            socket.on("error", handleSocketError );
+            socket.on("data" , forwardMessage  );
         }
 
-        function normalizeEventName( evt: MplexerEvtName ): "error" | MiniProtocol
+        function normalizeEventName( evt: MplexerEvtName ): "error" | "data" | "send" | MiniProtocol
         {
             if( !isMplexerEvtName( evt ) )
             {
                 dispatchEvent( "error", new Error("unknown multiplexer event: " + evt));
                 return "error";
             }
-            if( evt === "error" ) return evt;
+            if(
+                evt === "error" ||
+                evt === "data"  ||
+                evt === "send"
+            ) return evt;
             evt = miniProtocolToNumber( evt ) as MiniProtocolNum;
 
             if(
@@ -134,33 +153,8 @@ export class Multiplexer
             return evt;
         }
 
-        const eventListeners: MultiplexerEvtListeners = {
-            [MiniProtocol.Handshake]: [],
-            [MiniProtocol.ChainSync]: [],
-            [MiniProtocol.LocalChainSync]: [],
-            [MiniProtocol.BlockFetch]: [],
-            [MiniProtocol.TxSubmission]: [],
-            [MiniProtocol.LocalTxSubmission]: [],
-            [MiniProtocol.LocalStateQuery]: [],
-            [MiniProtocol.KeepAlive]: [],
-            [MiniProtocol.LocalTxMonitor]: [],
-            [MiniProtocol.PeerSharing]: [],
-            error: []
-        };
-
-        const onceEventListeners: MultiplexerEvtListeners = {
-            [MiniProtocol.Handshake]: [],
-            [MiniProtocol.ChainSync]: [],
-            [MiniProtocol.LocalChainSync]: [],
-            [MiniProtocol.BlockFetch]: [],
-            [MiniProtocol.TxSubmission]: [],
-            [MiniProtocol.LocalTxSubmission]: [],
-            [MiniProtocol.LocalStateQuery]: [],
-            [MiniProtocol.KeepAlive]: [],
-            [MiniProtocol.LocalTxMonitor]: [],
-            [MiniProtocol.PeerSharing]: [],
-            error: []
-        };
+        const eventListeners: MultiplexerEvtListeners = getInitialListeners( cfg.initialListeners );
+        const onceEventListeners: MultiplexerEvtListeners = getInitialListeners( cfg.initialOnceListeners );
 
         function handleSocketError( thing: Error | Event ): void
         {
@@ -175,6 +169,8 @@ export class Multiplexer
 
         function forwardMessage( chunk: Uint8Array ): void
         {
+            self.dispatchEvent("data", chunk);
+
             if( prevBytes )
             {
                 const tmp = new Uint8Array( prevBytes.length + chunk.length );
@@ -240,7 +236,8 @@ export class Multiplexer
         {
             if( protocol !== undefined )
             {
-                protocol = protocol === "error" ? protocol : miniProtocolToNumber( protocol ) as MiniProtocol;
+                protocol = protocol === "error" || protocol === "data" || protocol === "send" ? protocol :
+                    miniProtocolToNumber( protocol ) as MiniProtocol;
                 eventListeners[protocol].length = 0;
                 onceEventListeners[protocol].length = 0;
                 return;
@@ -256,6 +253,7 @@ export class Multiplexer
             eventListeners[MiniProtocol.KeepAlive]          .length = 0;
             eventListeners[MiniProtocol.PeerSharing]        .length = 0;
             eventListeners.error                            .length = 0;
+            eventListeners.data                             .length = 0;
 
             onceEventListeners[MiniProtocol.Handshake]          .length = 0;
             onceEventListeners[MiniProtocol.ChainSync]          .length = 0;
@@ -267,6 +265,7 @@ export class Multiplexer
             onceEventListeners[MiniProtocol.KeepAlive]          .length = 0;
             onceEventListeners[MiniProtocol.PeerSharing]        .length = 0;
             onceEventListeners.error                            .length = 0;
+            onceEventListeners.data                            .length = 0;
         }
 
         socket.on("close", reconnectSocket );
@@ -295,6 +294,7 @@ export class Multiplexer
 
         function send( payload: Uint8Array, header: MultiplexerHeaderInfos, attempt = 0 ): void
         {
+            self.dispatchEvent("send", payload, header);
             try{
                 void socket.send(
                     wrapMultiplexerMessage(
@@ -326,6 +326,16 @@ export class Multiplexer
                 onceEventListeners.error.push( listener as ErrorListener );
                 return self;
             }
+            else if( evt === "data" )
+            {
+                onceEventListeners.data.push( listener as any );
+                return self;
+            }
+            else if( evt === "send" )
+            {
+                onceEventListeners.send.push( listener as any );
+                return self;
+            }
 
             evt = miniProtocolToNumber( evt ) as any;
 
@@ -344,6 +354,16 @@ export class Multiplexer
                 eventListeners.error.push( listener as ErrorListener );
                 return self;
             }
+            else if( evt === "data" )
+            {
+                eventListeners.data.push( listener as any );
+                return self;
+            }
+            else if( evt === "send" )
+            {
+                eventListeners.send.push( listener as any );
+                return self;
+            }
 
             evt = miniProtocolToNumber( evt ) as any;
 
@@ -359,6 +379,18 @@ export class Multiplexer
             {
                 eventListeners.error = eventListeners.error.filter( fn => fn !== listener  );
                 onceEventListeners.error = eventListeners.error.filter( fn => fn !== listener  );
+                return self;
+            }
+            else if( evt === "data" )
+            {
+                eventListeners.data = eventListeners.data.filter( fn => fn !== listener );
+                onceEventListeners.data = eventListeners.data.filter( fn => fn !== listener );
+                return self;
+            }
+            else if( evt === "send" )
+            {
+                eventListeners.send = eventListeners.send.filter( fn => fn !== listener );
+                onceEventListeners.send = eventListeners.send.filter( fn => fn !== listener );
                 return self;
             }
 
@@ -379,10 +411,12 @@ export class Multiplexer
 
             const nListeners = listeners.length;
             const nOnceListeners = onceListeners.length;
+            const totListeners = nListeners + nOnceListeners;
 
-            if( evt === "error" && nListeners + nOnceListeners === 0 )
+            if( totListeners <= 0 )
             {
-                throw args[0] ?? new Error("unhandled error");
+                if( evt === "error" ) throw args[0] ?? new Error("unhandled error");
+                else return true;
             }
 
             for(let i = 0; i < nListeners; i++)
@@ -427,4 +461,53 @@ export class Multiplexer
             }
         );
     }
+}
+
+function getInitialListeners( cfgListeneres: Partial<MultiplexerEvtListeners> | undefined ): MultiplexerEvtListeners
+{
+    const listeners: MultiplexerEvtListeners = {
+        [MiniProtocol.Handshake]: [],
+        [MiniProtocol.ChainSync]: [],
+        [MiniProtocol.LocalChainSync]: [],
+        [MiniProtocol.BlockFetch]: [],
+        [MiniProtocol.TxSubmission]: [],
+        [MiniProtocol.LocalTxSubmission]: [],
+        [MiniProtocol.LocalStateQuery]: [],
+        [MiniProtocol.KeepAlive]: [],
+        [MiniProtocol.LocalTxMonitor]: [],
+        [MiniProtocol.PeerSharing]: [],
+        error: [],
+        data: [],
+        send: []
+    };
+
+    if(
+        cfgListeneres === undefined ||
+        !isObject( cfgListeneres )
+    ) return listeners;
+
+    const keys: (keyof MultiplexerEvtListeners)[] = [
+        MiniProtocol.Handshake,
+        MiniProtocol.ChainSync,
+        MiniProtocol.LocalChainSync,
+        MiniProtocol.BlockFetch,
+        MiniProtocol.TxSubmission,
+        MiniProtocol.LocalTxSubmission,
+        MiniProtocol.LocalStateQuery,
+        MiniProtocol.KeepAlive,
+        MiniProtocol.LocalTxMonitor,
+        MiniProtocol.PeerSharing,
+        "error",
+        "data",
+        "send"
+    ];
+
+    for( const key of keys )
+    {
+        if( !Array.isArray( cfgListeneres[key] ) ) continue;
+        /// @ts-ignore
+        listeners[key] = cfgListeneres[key].filter(( thing ) => typeof thing === "function" );
+    }
+
+    return listeners;
 }
