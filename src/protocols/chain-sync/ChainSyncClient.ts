@@ -317,6 +317,12 @@ export class ChainSyncClient
             }
 
             const onceListeners = onceEventListeners[evt];
+
+            if( evt === "error" && nListeners + onceListeners.length === 0 )
+            {
+                throw msg instanceof Error ? msg : new Error( "Unhandled error: " + msg );
+            }
+
             while( onceListeners.length > 0 )
             {
                 onceListeners.shift()!(msg as any);

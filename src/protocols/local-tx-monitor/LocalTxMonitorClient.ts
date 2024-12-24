@@ -195,7 +195,12 @@ export class TxMonitorClient
             let listeners = eventListeners[ evt ]
             if( !listeners ) return;
             for( const cb of listeners ) cb( msg );
+            const nListeners = eventListeners[ evt ].length;
             listeners = onceEventListeners[ evt ];
+            if( (evt as any) === "error" && nListeners === 0 && listeners.length === 0 )
+            {
+                throw msg instanceof Error ? msg : new Error("Unhandled error: " + msg);
+            }
             let cb: TxMonitorClientEvtListener;
             while( cb = listeners.shift()! ) cb( msg );
             return true;

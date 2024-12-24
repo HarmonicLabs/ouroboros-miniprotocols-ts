@@ -247,6 +247,11 @@ export class LocalStateQueryClient
             }
 
             const onceListeners = onceEventListeners[eventName];
+            if( eventName === "error" && nListeners + onceListeners.length === 0 )
+            {
+                throw msg instanceof Error ? msg : new Error( "Unhandled error: " + msg );
+            }
+
             while( onceListeners.length > 0 )
             {
                 onceListeners.shift()!(msg as any);

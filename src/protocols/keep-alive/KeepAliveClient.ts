@@ -148,10 +148,15 @@ export class KeepAliveClient
 
         function dispatchEvent( evt: KeepAliveClientEvt, msg: KeepAliveMessage )
         {
-            let listeners = eventListeners[ evt ]
+            let listeners = eventListeners[ evt ];
             if( !listeners ) return;
             for( const cb of listeners ) cb( msg as any );
+            const nListeners = listeners.length;
             listeners = onceEventListeners[ evt ];
+            if( evt === "error" && nListeners + listeners.length === 0 )
+            {
+                throw msg instanceof Error ? msg : new Error( "Unhandled error: " + msg );
+            }
             let cb: KeepAliveClientEvtListener;
             while( cb = listeners.shift()! as any ) cb( msg );
             return true;

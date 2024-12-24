@@ -184,6 +184,7 @@ export class VersionData
     }
     static fromCborObj( cbor: CborObj, n2n: boolean = true ): VersionData
     {
+        console.log("VersionData.fromCborObj", cbor.toRawObj());
         if(!(
             cbor instanceof CborArray &&
             cbor.array.length >= 2 &&
@@ -224,14 +225,14 @@ export class VersionData
         }
 
         if(!(
-            cbor.array[2] instanceof CborSimple &&
+            cbor.array[2] instanceof CborUInt &&
             cbor.array[3] instanceof CborSimple
         )) throw new Error("invalid CBOR for 'VersionData'");
 
         return new VersionData({
             networkMagic: Number( cbor.array[0].num ),
             initiatorOnlyDiffusionMode: bool( cbor.array[1].simple, false ),
-            peerSharing: bool( cbor.array[2].simple, false ),
+            peerSharing: Number( cbor.array[2].num ) === 0 ? false : true,
             query: bool( cbor.array[3].simple, false ),
         }, {
             includePeerSharing: true,
