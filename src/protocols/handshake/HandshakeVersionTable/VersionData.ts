@@ -173,7 +173,7 @@ export class VersionData
         return new CborArray([
             new CborUInt(   this.networkMagic ),
             new CborSimple( this.initiatorOnlyDiffusionMode ),
-            new CborSimple( this.peerSharing ),
+            new CborUInt( this.peerSharing ? 1 : 0 ),
             new CborSimple( this.query ),
         ].filter( v => v !== undefined ));
     }
