@@ -241,26 +241,10 @@ export class TxSubmitClient
     }
     clearListeners( evt?: TxSubmitClientEvt ) : void
     {
-        this._clearListeners( this._eventListeners, evt );
-        this._clearListeners( this._onceEventListeners, evt );
+        _clearListeners( this._eventListeners, evt );
+        _clearListeners( this._onceEventListeners, evt );
     }
-    private _clearListeners( listeners: TxSubmitClientEvtListeners, evt?: TxSubmitClientEvt ) : void
-    {
-        if( isTxSubClientEvtName( evt ) )
-        {
-            listeners[ evt ] = [];
-        }
-        else
-        {
-            for( const key in listeners )
-            {
-                if( listeners.hasOwnProperty(key) ) 
-                {
-                    listeners[key as TxSubmitClientEvt] = [];
-                }
-            }
-        }
-    }
+    
     
     // tx-submission client messages
 
@@ -333,3 +317,18 @@ export class TxSubmitClient
         );
     }
 }
+
+function _clearListeners( listeners: TxSubmitClientEvtListeners, evt?: TxSubmitClientEvt ) : void
+    {
+        if( isTxSubClientEvtName( evt ) )
+        {
+            listeners[ evt ].length = 0;
+        }
+        else
+        {
+            for( const key in listeners )
+            {
+                listeners[ key as TxSubmitClientEvt ].length = 0;
+            }
+        }
+    }

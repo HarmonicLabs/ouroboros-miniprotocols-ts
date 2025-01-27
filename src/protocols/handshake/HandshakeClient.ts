@@ -13,7 +13,6 @@ import { toHex } from "@harmoniclabs/uint8array-utils";
 import { AddEvtListenerOpts } from "../../common/AddEvtListenerOpts";
 import { NetworkMagic } from "./HandshakeVersionTable";
 
-
 type HandshakeClientEvtName     = keyof Omit<HandshakeClientEvtListeners, "error">;
 type AnyHandshakeClientEvtName  = HandshakeClientEvtName | "error";
 
@@ -68,6 +67,13 @@ type EvtListenerOf<EvtName extends AnyHandshakeClientEvtName> =
     EvtName extends "error"         ? ( err: Error )                    => void :
     never;
 
+type DataOf<EvtName extends AnyHandshakeClientEvtName> =
+    EvtName extends "propose"       ? HandshakeProposeVersion :
+    EvtName extends "accept"        ? HandshakeAcceptVersion :
+    EvtName extends "refuse"        ? HandshakeRefuse :
+    EvtName extends "queryReply"    ? HandshakeQueryReply :
+    EvtName extends "error"         ? Error :
+    never;
 
 const mplexerHeader = Object.freeze({
     hasAgency: true,
@@ -295,19 +301,19 @@ export class HandshakeClient
         return this.clearListeners( evt );
     }
 
-    once( evt: HandshakeClientEvtName, listener: AnyHandshakeClientEvtListener ): this
+    once<EvtName extends AnyHandshakeClientEvtName>( evt: EvtName, listener: EvtListenerOf<EvtName> ): this
     {
         if( !isAnyHandshakeClientEvtName( evt ) ) return this;
 
         this._onceListeners[ evt ].push( listener as any );
         return this;
     }
-    addEventListenerOnce( evt: HandshakeClientEvtName, listener: AnyHandshakeClientEvtListener ): this
+    addEventListenerOnce<EvtName extends AnyHandshakeClientEvtName>( evt: EvtName, listener: EvtListenerOf<EvtName> ): this
     {
         return this.once( evt, listener );
     }
 
-    on( evt: HandshakeClientEvtName, listener: AnyHandshakeClientEvtListener, opts?: AddEvtListenerOpts ): this
+    on<EvtName extends AnyHandshakeClientEvtName>( evt: EvtName, listener: EvtListenerOf<EvtName>, opts?: AddEvtListenerOpts ): this
     {
         if( opts?.once === true ) return this.addEventListenerOnce( evt, listener );
         
@@ -316,11 +322,11 @@ export class HandshakeClient
         this._listeners[ evt ].push( listener as any );
         return this;
     }
-    addEventListener( evt: HandshakeClientEvtName, listener: AnyHandshakeClientEvtListener ): this
+    addEventListener<EvtName extends AnyHandshakeClientEvtName>( evt: EvtName, listener: EvtListenerOf<EvtName> ): this
     {
         return this.on( evt, listener );
     }
-    addListener( evt: HandshakeClientEvtName, listener: AnyHandshakeClientEvtListener ): this
+    addListener<EvtName extends AnyHandshakeClientEvtName>( evt: EvtName, listener: EvtListenerOf<EvtName> ): this
     {
         return this.on( evt, listener );
     }
@@ -342,7 +348,7 @@ export class HandshakeClient
         return this.off( evt, listener );
     }
 
-    dispatchEvent( evt: AnyHandshakeClientEvtName, msg: HandshakeMessage | Error ): boolean
+    dispatchEvent<EvtName extends AnyHandshakeClientEvtName>( evt: EvtName, msg: DataOf<EvtName> ): boolean
     {
         if( !isAnyHandshakeClientEvtName( evt ) ) return true;
         if( evt !== "error" && !isHandshakeMessage( msg ) ) return true;
@@ -368,7 +374,7 @@ export class HandshakeClient
 
         return true;
     }
-    emit( evt: AnyHandshakeClientEvtName, msg: HandshakeMessage | Error ): boolean
+    emit<EvtName extends AnyHandshakeClientEvtName>( evt: EvtName, msg: DataOf<EvtName> ): boolean
     {
         return this.dispatchEvent( evt, msg );
     }

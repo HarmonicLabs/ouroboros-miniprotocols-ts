@@ -97,7 +97,22 @@ export function versionTableFromCborObj( cbor: CborObj, n2n: boolean = true ): V
 
         n = VersionNumber( n );
 
-        result[ n ] = VersionData.fromCborObj( v, n2n );
+        const isNode2clientVersion = (n >>> 15 === 1);
+
+        // up to client version 14 only the network magic was stored
+        if( isNode2clientVersion && n <= 32782 )
+        {
+            if(!( v instanceof CborUInt ))
+                throw new Error("invalid CBOR for 'VersionTableMap'; invalid 'VersionData'");
+
+            result[ n ] = new VersionData({
+                networkMagic: Number( v.num ),
+            });
+        }
+        else
+        {
+            result[ n ] = VersionData.fromCborObj( v, n2n );
+        }
     }
 
     return normalizeVersionTableMap( result );
@@ -109,13 +124,24 @@ export function versionTableToCbor( versionTable: VersionTableMap, n2n: boolean 
 }
 export function versionTableToCborObj( versionTable: VersionTableMap, n2n: boolean = true ): CborMap
 {
+    // git commit -m "fix handshake client typing, fix n2c version table parse"
     return new CborMap(
         getSortedVersions( versionTable )
-        .map( ver => ({
-            k: new CborUInt(
-                n2n ? ver : toClientVersionNumber( ver )
-            ),
-            v: versionTable[ ver ].toCborObj()
-        }))
+        .map( ver => {
+
+            const versionNumber = n2n ? ver : toClientVersionNumber( ver );
+
+            let entryData = versionTable[ ver ].toCborObj();
+            if( !n2n && ver <= 14 )
+            {
+                // node to client versions up to 14 only store the network magic
+                entryData = new CborUInt( versionTable[ ver ].networkMagic );
+            }
+
+            return {
+                k: new CborUInt( versionNumber ),
+                v: entryData
+            }
+        })
     );
 }
