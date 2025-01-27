@@ -24,6 +24,9 @@ versionNumber = 32784 / 32785 / 32786 / 32787
 ; As of version 15 and higher
 nodeToClientVersionData = [networkMagic, query]
 
+; version 14 and before
+oldNodeToClientVersionData = networkMagic
+
 networkMagic = uint
 query        = bool
 

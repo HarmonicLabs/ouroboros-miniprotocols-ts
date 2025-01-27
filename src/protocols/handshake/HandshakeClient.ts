@@ -12,6 +12,15 @@ import { HandshakeRefuse } from "./messages/HandshakeRefuse";
 import { toHex } from "@harmoniclabs/uint8array-utils";
 import { AddEvtListenerOpts } from "../../common/AddEvtListenerOpts";
 import { NetworkMagic } from "./HandshakeVersionTable";
+import { isObject } from "@harmoniclabs/obj-utils";
+
+export interface ProposeOpts {
+    includeN2COldVersions: boolean
+}
+
+const defaultProposeOpts: ProposeOpts = Object.freeze({
+    includeN2COldVersions: false
+});
 
 type HandshakeClientEvtName     = keyof Omit<HandshakeClientEvtListeners, "error">;
 type AnyHandshakeClientEvtName  = HandshakeClientEvtName | "error";
@@ -206,9 +215,13 @@ export class HandshakeClient
 
     propose(
         /** @default versionTable defaults to all the known versions (depending by n2n or n2c) */
-        arg?: VersionTableMap | IVersionData | VersionData | NetworkMagic
+        arg?: VersionTableMap | IVersionData | VersionData | NetworkMagic,
+        opts: Partial<ProposeOpts> = {}
     ): Promise<HandshakeAcceptVersion | HandshakeRefuse | HandshakeQueryReply>
     {
+        opts = isObject( opts ) ? opts : {};
+        opts = { ...defaultProposeOpts, ...opts };
+
         const self = this;
         const isN2N = self.mplexer.isN2N;
         const versionTable = normalizeProposeArg( arg, isN2N );
@@ -382,7 +395,8 @@ export class HandshakeClient
 
 function normalizeProposeArg(
     arg: VersionTableMap | IVersionData | undefined | NetworkMagic,
-    isN2N: boolean
+    isN2N: boolean,
+    opts: ProposeOpts = defaultProposeOpts
 ): VersionTableMap
 {
     if( typeof arg === "number" ) return normalizeProposeArg({ networkMagic: arg }, isN2N );
