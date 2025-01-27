@@ -153,14 +153,7 @@ export class VersionData
     }
     toCborObj(): CborObj
     {
-        // old n2n version data
-        // nodeToNodeVersionData = [ networkMagic, initiatorOnlyDiffusionMode ]
-        if( !this.includePeerSharing )
-        return new CborArray([
-            new CborUInt( this.networkMagic ),
-            new CborSimple( this.initiatorOnlyDiffusionMode ),
-        ]);
-        
+        // always check FIRST
         // n2c
         // nodeToClientVersionData = [networkMagic, query]
         if( this.includeQuery && !this.includePeerSharing )
@@ -169,6 +162,14 @@ export class VersionData
             new CborSimple( this.query ),
         ]);
 
+        // old n2n version data
+        // nodeToNodeVersionData = [ networkMagic, initiatorOnlyDiffusionMode ]
+        if( !this.includePeerSharing )
+        return new CborArray([
+            new CborUInt( this.networkMagic ),
+            new CborSimple( this.initiatorOnlyDiffusionMode ),
+        ]);
+        
         // nodeToNodeVersionData = [ networkMagic, initiatorOnlyDiffusionMode, peerSharing, query ]
         return new CborArray([
             new CborUInt(   this.networkMagic ),
@@ -184,13 +185,21 @@ export class VersionData
     }
     static fromCborObj( cbor: CborObj, n2n: boolean = true ): VersionData
     {
+        // old node to client version data (n2c v14 and before)
+        if( cbor instanceof CborUInt ) return new VersionData({
+            networkMagic: Number( cbor.num ),
+        });
+
         if(!(
             cbor instanceof CborArray &&
             cbor.array.length >= 2 &&
             cbor.array.length !== 3 &&
             cbor.array[0] instanceof CborUInt &&
             cbor.array[1] instanceof CborSimple
-        )) throw new Error("invalid CBOR for 'VersionData'");
+        )) throw new Error(
+            "invalid CBOR for 'VersionData': " + 
+            Cbor.encode( cbor ).toString()
+        );
 
         n2n = bool( n2n, true );
         const len = cbor.array.length;
@@ -226,7 +235,10 @@ export class VersionData
         if(!(
             cbor.array[2] instanceof CborUInt &&
             cbor.array[3] instanceof CborSimple
-        )) throw new Error("invalid CBOR for 'VersionData'");
+        )) throw new Error(
+            "invalid CBOR for 'VersionData'" +
+            Cbor.encode( cbor ).toString()
+        );
 
         return new VersionData({
             networkMagic: Number( cbor.array[0].num ),

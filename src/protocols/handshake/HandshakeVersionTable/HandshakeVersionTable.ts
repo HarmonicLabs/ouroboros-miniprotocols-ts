@@ -3,7 +3,6 @@ import { safeParseInt } from "../../utils/safeParseInt";
 import { isIVersionData, IVersionData, VersionData } from "./VersionData";
 import { isExtendedVersionNumber, isVersionNumber, toClientVersionNumber, VersionNumber } from "./VersionNumber";
 import { CanBeCborString, Cbor, forceCborString, CborObj, CborMap, CborUInt, CborString } from "@harmoniclabs/cbor";
-import { AsOptions } from "../../types/AsOptions";
 
 export interface IVersionTableMap {
     [ version: number ]: IVersionData
@@ -124,7 +123,6 @@ export function versionTableToCbor( versionTable: VersionTableMap, n2n: boolean 
 }
 export function versionTableToCborObj( versionTable: VersionTableMap, n2n: boolean = true ): CborMap
 {
-    // git commit -m "fix handshake client typing, fix n2c version table parse"
     return new CborMap(
         getSortedVersions( versionTable )
         .map( ver => {
