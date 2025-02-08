@@ -164,7 +164,7 @@ export class LocalTxSubmitClient
             if( !listeners ) return;
             for( const cb of listeners ) cb( msg );
             listeners = onceEventListeners[ evt ];
-            let cb: LocalTxSubmitClientEvtListener;
+            let cb: ( ...args: any[] ) => any;
             while( cb = listeners.shift()! ) cb( msg );
             return true;
         }

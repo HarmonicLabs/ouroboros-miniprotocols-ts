@@ -201,7 +201,7 @@ export class TxMonitorClient
             {
                 throw msg instanceof Error ? msg : new Error("Unhandled error: " + msg);
             }
-            let cb: TxMonitorClientEvtListener;
+            let cb: (...args: any[]) => any;
             while( cb = listeners.shift()! ) cb( msg );
             return true;
         }

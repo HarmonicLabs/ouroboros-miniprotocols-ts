@@ -147,16 +147,14 @@ export class PeerSharingClient {
 
         function dispatchEvent( evt: PeerSharingClientEvt, msg: PeerSharingMessage ) {
             let listeners = eventListeners[ evt ];
-
             if( !listeners ) return;
 
             for( const cb of listeners ) cb( msg as any );
 
             listeners = onceEventListeners[ evt ];
 
-            let cb: PeerSharingClientEvtListener;
-
-            while( cb = listeners.shift()! as any ) cb( msg );
+            let cb: ( ...args: any[] ) => any;
+            while( cb = listeners.shift()! ) cb( msg );
 
             return true;
         }

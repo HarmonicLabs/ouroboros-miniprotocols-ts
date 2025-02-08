@@ -260,14 +260,13 @@ export class TxSubmitServer
     dispatchEvent( evt: TxSubmitServerEvt, msg: TxSubmitMessage ) 
     {
         let listeners = this._eventListeners[ evt ]
-
         if( !listeners ) return;
 
         for( const cb of listeners ) cb( msg );
 
         listeners = this._onceEventListeners[ evt ];
-        let cb: TxSubmitServerEvtListener;
 
+        let cb: ( ...args: any[] ) => any;
         while( cb = listeners.shift()! ) cb( msg );
 
         return true;

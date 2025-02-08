@@ -235,9 +235,10 @@ export class BlockFetchClient
                 throw msg instanceof Error ? msg : new Error( "Unhandled error: " + msg );
             }
 
-            while( onceListeners.length > 0 )
+            let cb: ( ...args: any[] ) => void;
+            while( cb = onceListeners.shift()! )
             {
-                onceListeners.shift()!(msg as any);
+                cb( msg );
             }
 
             return true;

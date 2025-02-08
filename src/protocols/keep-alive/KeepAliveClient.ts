@@ -157,8 +157,8 @@ export class KeepAliveClient
             {
                 throw msg instanceof Error ? msg : new Error( "Unhandled error: " + msg );
             }
-            let cb: KeepAliveClientEvtListener;
-            while( cb = listeners.shift()! as any ) cb( msg );
+            let cb: ( ...args: any[] ) => any;
+            while( cb = listeners.shift()! ) cb( msg );
             return true;
         }
 

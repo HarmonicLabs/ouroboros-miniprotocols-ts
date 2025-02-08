@@ -228,8 +228,8 @@ export class TxSubmitClient
         for( const cb of listeners ) cb( msg );
 
         listeners = this._onceEventListeners[ evt ];
-        let cb: TxSubmitClientEvtListener;
 
+        let cb: ( ...args: any[] ) => any;
         while( cb = listeners.shift()! ) cb( msg );
 
         return true;

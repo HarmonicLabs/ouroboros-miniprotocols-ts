@@ -410,8 +410,7 @@ export class Multiplexer
             const onceListeners = onceEventListeners[evt as MiniProtocol];
 
             const nListeners = listeners.length;
-            const nOnceListeners = onceListeners.length;
-            const totListeners = nListeners + nOnceListeners;
+            const totListeners = nListeners + onceListeners.length;
 
             if( totListeners <= 0 )
             {
@@ -425,10 +424,10 @@ export class Multiplexer
                 listeners[i]( ...args );
             }
 
-            while( nOnceListeners > 0 )
+            let cb: ( ...args: any[] ) => void;
+            while( cb = onceListeners.shift()! )
             {
-                // @ts-ignore
-                onceListeners.shift()!( ...args );
+                cb( ...args );
             }
 
             return true;
