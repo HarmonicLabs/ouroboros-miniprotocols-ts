@@ -106,13 +106,14 @@ export class Multiplexer
         const socketLike = reconnect();
         let socket = wrapSocket( socketLike, reconnect );
         const isN2N: boolean = cfg.protocolType !== "node-to-client";
-        
+        let _wasClosed: boolean = false;
+
+        let reconnectAttepmts = 0;
+
         function reconnectSocket(): void
         {
-            if( socket.isClosed() )
-            {
-                socket = wrapSocket( socket.reconnect(), reconnect );
-            }
+            if( socket.isClosed() ) return;
+            socket.on("connect", () => reconnectAttepmts = 0 );
             socket.on("close", reconnectSocket );
             socket.on("error", handleSocketError );
             socket.on("data" , forwardMessage  );
@@ -158,6 +159,7 @@ export class Multiplexer
 
         function handleSocketError( thing: Error | Event ): void
         {
+            _wasClosed = true;
             const err = new Error("socket error");
             (err as any).data = thing;
             dispatchEvent("error", err);
@@ -272,8 +274,6 @@ export class Multiplexer
         socket.on("error", handleSocketError );
         socket.on("data" , forwardMessage  );
 
-        let _wasClosed: boolean = false;
-
         function close( options?: MultiplexerCloseOptions ): void
         {
             socket.off("close", reconnectSocket );
@@ -294,6 +294,7 @@ export class Multiplexer
 
         function send( payload: Uint8Array, header: MultiplexerHeaderInfos, attempt = 0 ): void
         {
+            if( isClosed() ) return
             self.dispatchEvent("send", payload, header);
             try{
                 void socket.send(
