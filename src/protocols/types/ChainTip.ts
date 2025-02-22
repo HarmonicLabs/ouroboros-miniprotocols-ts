@@ -30,22 +30,8 @@ export class ChainTip
             canBeUInteger( blockNo )
         )) throw new Error("invalid IChainTip interface");
 
-        Object.defineProperties(
-            this, {
-                point: {
-                    value: new ChainPoint( point ),
-                    writable: false,
-                    enumerable: true,
-                    configurable: false
-                },
-                blockNo: {
-                    value: forceBigUInt( blockNo ),
-                    writable: false,
-                    enumerable: true,
-                    configurable: false
-                }
-            }
-        );
+        this.point = point instanceof ChainPoint ? point : new ChainPoint( point );
+        this.blockNo = forceBigUInt( blockNo );
     }
 
     toJSON() { return this.toJson(); }
