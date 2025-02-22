@@ -1,6 +1,6 @@
-import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
+import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborUInt, SubCborRef, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
 import { IChainTip, ChainTip, isIChainTip } from "../../types";
-import { getCborBytesDescriptor } from "../../utils/getCborBytesDescriptor";
+import { getSubCborRef, subCborRefOrUndef } from "../../utils/getSubCborRef";
 
 export interface IChainSyncIntersectNotFound {
     tip: IChainTip
@@ -9,29 +9,23 @@ export interface IChainSyncIntersectNotFound {
 export class ChainSyncIntersectNotFound
     implements ToCbor, ToCborObj, IChainSyncIntersectNotFound
 {
-    readonly cborBytes?: Uint8Array | undefined;
-    
     readonly tip: ChainTip;
 
-    constructor({ tip }: IChainSyncIntersectNotFound)
+    constructor(
+        intersect: IChainSyncIntersectNotFound,
+        readonly cborRef: SubCborRef | undefined = undefined
+    )
     {
+        const { tip } = intersect;
         if(!(
             isIChainTip( tip )
         )) throw new Error("invalid IChainSyncIntersectNotFound interface");
 
-        Object.defineProperties(
-            this, {
-                cborBytes: getCborBytesDescriptor(),
-                tip: {
-                    value: new ChainTip( tip ),
-                    writable: false,
-                    enumerable: true,
-                    configurable: false
-                }
-            }
-        );
+        this.tip = tip instanceof ChainTip ? tip : new ChainTip( tip );
+        this.cborRef = cborRef ?? subCborRefOrUndef( intersect );
     };
 
+    toJSON() { return this.toJson(); }
     toJson()
     {
         return {
@@ -39,26 +33,23 @@ export class ChainSyncIntersectNotFound
         }
     }
 
+    toCborBytes(): Uint8Array
+    {
+        if( this.cborRef instanceof SubCborRef ) return this.cborRef.toBuffer();
+        return this.toCbor().toBuffer();
+    }
     toCbor(): CborString
     {
-        return new CborString( this.toCborBytes() );
+        if( this.cborRef instanceof SubCborRef ) return new CborString( this.cborRef.toBuffer() );
+        return Cbor.encode( this.toCborObj() );
     }
-    toCborObj()
+    toCborObj(): CborArray
     {
+        if( this.cborRef instanceof SubCborRef ) return Cbor.parse( this.cborRef.toBuffer() ) as CborArray;
         return new CborArray([
             new CborUInt(6),
             this.tip.toCborObj()
         ]);
-    }
-    toCborBytes(): Uint8Array
-    {
-        if(!( this.cborBytes instanceof Uint8Array ))
-        {
-            // @ts-ignore Cannot assign to 'cborBytes' because it is a read-only property.
-            this.cborBytes = Cbor.encode( this.toCborObj() ).toBuffer();
-        }
-
-        return Uint8Array.prototype.slice.call( this.cborBytes );
     }
     
 
@@ -68,14 +59,12 @@ export class ChainSyncIntersectNotFound
             cbor: 
             forceCborString( cbor ).toBuffer();
             
-        const msg = ChainSyncIntersectNotFound.fromCborObj( Cbor.parse( buff ) );
-        
-        // @ts-ignore Cannot assign to 'cborBytes' because it is a read-only property.ts(2540)
-        msg.cborBytes = buff;
-        
-        return msg;
+        return ChainSyncIntersectNotFound.fromCborObj( Cbor.parse( buff ), buff );
     }
-    static fromCborObj( cbor: CborObj ): ChainSyncIntersectNotFound
+    static fromCborObj(
+        cbor: CborObj,
+        originalBytes: Uint8Array | undefined = undefined
+    ): ChainSyncIntersectNotFound
     {
         if(!(
             cbor instanceof CborArray &&
@@ -88,6 +77,6 @@ export class ChainSyncIntersectNotFound
 
         return new ChainSyncIntersectNotFound({
             tip: ChainTip.fromCborObj( tipCbor )
-        });
+        }, getSubCborRef( cbor, originalBytes ));
     }
 }

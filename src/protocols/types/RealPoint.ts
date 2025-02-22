@@ -34,7 +34,7 @@ export class RealPoint extends ChainPoint
         return new RealPoint({
             blockHeader: {
                 slotNumber: slot.num,
-                hash: hash.buffer
+                hash: hash.bytes
             }
         });
     }

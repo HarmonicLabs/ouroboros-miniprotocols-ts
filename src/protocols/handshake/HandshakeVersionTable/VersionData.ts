@@ -147,6 +147,10 @@ export class VersionData
         });
     }
 
+    toCborBytes(): Uint8Array
+    {
+        return this.toCbor().toBuffer();
+    }
     toCbor(): CborString
     {
         return Cbor.encode( this.toCborObj() );

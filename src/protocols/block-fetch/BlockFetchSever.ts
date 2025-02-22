@@ -3,19 +3,18 @@ import { BlockFetchMessage, blockFetchMessageFromCborObj, isBlockFetchMessage } 
 import { AddEvtListenerOpts } from "../../common/AddEvtListenerOpts";
 import { toHex } from "@harmoniclabs/uint8array-utils";
 import { CborObj, Cbor } from "@harmoniclabs/cbor";
-import { IBlockAck } from "./interfaces/IBlockAck";
 import { MiniProtocol } from "../../MiniProtocol";
 import { IChainDb } from "../interfaces/IChainDb";
 import { Multiplexer } from "../../multiplexer";
 import { ChainPoint } from "../types";
 
-type BlockFetchServerEvtName     = keyof Omit<BlockFetchServerEvtListeners, "error" & "nextBlock">;
-type AnyBlockFetchServerEvtName  = BlockFetchServerEvtName | "error" | "nextBlock";
+type BlockFetchServerEvtName     = keyof Omit<BlockFetchServerEvtListeners, "error">;
+type AnyBlockFetchServerEvtName  = BlockFetchServerEvtName | "error";
 
 type BlockFetchServerEvtListeners = {
     requestRange    : BlockFetchServerEvtListener[]     ,
     done            : BlockFetchServerEvtListener[]     ,    
-    nextBlock       : (( ack: IBlockAck ) => void)[]    ,
+    // block           : BlockFetchServerEvtListener[]     ,
     error           : (( err: Error ) => void)[]
 };
 
@@ -25,14 +24,15 @@ type AnyBlockFetchServerEvtListener  = BlockFetchServerEvtListener | (( err: Err
 type MsgOf<EvtName extends AnyBlockFetchServerEvtName> =
     EvtName extends "requestRange"  ? BlockFetchRequestRange    :
     EvtName extends "done"          ? BlockFetchClientDone      :
-    EvtName extends "nextBlock"     ? IBlockAck                 :
+    // EvtName extends "block"         ? BlockFetchBlock           :
     EvtName extends "error"         ? Error                     :
     never                                                       ;
 
 function msgToName( msg: BlockFetchMessage ): BlockFetchServerEvtName | undefined
 {
-    if( msg instanceof BlockFetchRequestRange )       return "requestRange" ;
-    if( msg instanceof BlockFetchClientDone )         return "done"         ;
+    if( msg instanceof BlockFetchRequestRange )       return "requestRange";
+    if( msg instanceof BlockFetchClientDone )         return "done";
+    // if( msg instanceof BlockFetchBlock )              return "block"; 
     
     return undefined;
 }
@@ -52,7 +52,7 @@ function isBlockFetchServerEvtName( str: any ): str is BlockFetchServerEvtName
 type EvtListenerOf<EvtName extends AnyBlockFetchServerEvtName> =
     EvtName extends "requestRange"  ? ( msg: BlockFetchRequestRange )   => void :
     EvtName extends "done"          ? ( msg: BlockFetchClientDone )     => void :
-    EvtName extends "nextBlock"     ? ( ack: IBlockAck )                => void :
+    // EvtName extends "nextBlock"     ? ( ack: IBlockAck )                => void :
     never                                                                       ;
 
 export class BlockFetchServer
@@ -63,14 +63,12 @@ export class BlockFetchServer
     private eventListeners: BlockFetchServerEvtListeners = Object.freeze({
         requestRange:   [],
         done:           [],
-        nextBlock:      [],
         error:          []
     });
 
     private onceEventListeners: BlockFetchServerEvtListeners = Object.freeze({
         requestRange:   [],
         done:           [],
-        nextBlock:      [],
         error:          []
     });
     
@@ -205,10 +203,11 @@ export class BlockFetchServer
     }
     async handleRequestRange( from: ChainPoint, to: ChainPoint )
     {
+        // TODO: async iterator
         const blocksBetween = await this.chainDb.getBlocksBetweenRange( from, to );
 
         if( !blocksBetween ) return this.sendNoBlocks();
-        else await this.sendStartBatch();
+        else this.sendStartBatch();
 
         let blockSlotNo: number | bigint;
 
@@ -216,30 +215,18 @@ export class BlockFetchServer
         {
             blockSlotNo = block.blockHeader?.slotNumber ?? -1;
             
-            await this.multiplexer.send(
-                new BlockFetchBlock(
-                    { 
-                        blockCbor: block.toCbor().toBuffer() 
-                    }
-                ).toCbor().toBuffer(),
+            this.multiplexer.send(
+                new BlockFetchBlock({ 
+                    blockData: block.toCborBytes() 
+                }).toCbor().toBuffer(),
                 { 
                     hasAgency: true, 
                     protocol: MiniProtocol.BlockFetch 
                 }
             );
-
-            await new Promise<void>(( resolve ) => {
-                this.once( "nextBlock", ( ack: IBlockAck ) => {
-                    if( blockSlotNo === ack.blockSlotNo )
-                    {
-                        this.emit( 'nextBlock', ack );
-                        resolve();
-                    }
-                });
-            });
         }
 
-        await this.sendBatchDone();
+        this.sendBatchDone();
     }
 
     handleClientDone()

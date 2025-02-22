@@ -1,6 +1,5 @@
-import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
+import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborUInt, ToCbor, ToCborObj, ToCborString, forceCborString } from "@harmoniclabs/cbor";
 import { isObject } from "@harmoniclabs/obj-utils";
-import { getCborBytesDescriptor } from "../../utils/getCborBytesDescriptor";
 
 export interface IPeerSharingDone {}
 
@@ -8,42 +7,24 @@ export function isIPeerSharingDone( stuff: any ): stuff is IPeerSharingDone {
     return isObject( stuff );
 }
 
-export class PeerSharingDone implements ToCbor, ToCborObj, IPeerSharingDone {
+export class PeerSharingDone implements ToCborString, ToCborObj, IPeerSharingDone {
+    constructor() {};
 
-    readonly cborBytes?: Uint8Array | undefined;
-
-    constructor() {
-        Object.defineProperty(
-            this, "cborBytes", getCborBytesDescriptor()
-        );
-    };
-
-    toCbor(): CborString {
-        return new CborString( this.toCborBytes() );
+    toCborBytes(): Uint8Array
+    {
+        return this.toCbor().toBuffer();
     }
-
+    toCbor(): CborString {
+        return Cbor.encode( this.toCborObj() );
+    }
     toCborObj() {
         return new CborArray([ new CborUInt(2) ]);
     }
 
-    toCborBytes(): Uint8Array {
-        if(!( this.cborBytes instanceof Uint8Array )) {
-            // @ts-ignore Cannot assign to 'cborBytes' because it is a read-only property.
-            this.cborBytes = Cbor.encode( this.toCborObj() ).toBuffer();
-        }
-
-        return Uint8Array.prototype.slice.call( this.cborBytes );
-    }
-
-    static fromCbor( cbor: CanBeCborString ): PeerSharingDone {
+    static fromCbor( cbor: CanBeCborString ): PeerSharingDone
+    {
         const buff = cbor instanceof Uint8Array ? cbor: forceCborString( cbor ).toBuffer();
-            
-        const msg = PeerSharingDone.fromCborObj( Cbor.parse( buff ) );
-        
-        // @ts-ignore Cannot assign to 'cborBytes' because it is a read-only property.ts(2540)
-        msg.cborBytes = buff;
-        
-        return msg;
+        return PeerSharingDone.fromCborObj( Cbor.parse( buff ) );
     }
 
     static fromCborObj( cbor: CborObj ): PeerSharingDone {

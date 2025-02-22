@@ -1,6 +1,5 @@
-import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
+import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborUInt, SubCborRef, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
 import { isObject } from "@harmoniclabs/obj-utils";
-import { getCborBytesDescriptor } from "../../utils/getCborBytesDescriptor";
 
 export interface IChainSyncAwaitReply {};
 
@@ -12,34 +11,27 @@ export function isIChainSyncAwaitReply( stuff: any ): stuff is IChainSyncAwaitRe
 export class ChainSyncAwaitReply
     implements ToCbor, ToCborObj, IChainSyncAwaitReply
 {
-    readonly cborBytes?: Uint8Array | undefined;
-    
-    constructor()
-    {
-        Object.defineProperty(
-            this, "cborBytes", getCborBytesDescriptor()
-        );
-    };
+    constructor(
+        readonly cborRef: SubCborRef | undefined = undefined
+    ){};
 
+    toJSON() { return this.toJson(); }
     toJson() { return {}; }
 
-    toCbor(): CborString
-    {
-        return new CborString( this.toCborBytes() );
-    }
-    toCborObj()
-    {
-        return new CborArray([ new CborUInt(1) ]);
-    }
     toCborBytes(): Uint8Array
     {
-        if(!( this.cborBytes instanceof Uint8Array ))
-        {
-            // @ts-ignore Cannot assign to 'cborBytes' because it is a read-only property.
-            this.cborBytes = Cbor.encode( this.toCborObj() ).toBuffer();
-        }
-
-        return Uint8Array.prototype.slice.call( this.cborBytes );
+        // if( this.cborRef instanceof SubCborRef ) return this.cborRef.toBuffer();
+        return this.toCbor().toBuffer();
+    }
+    toCbor(): CborString
+    {
+        if( this.cborRef instanceof SubCborRef ) return new CborString( this.cborRef.toBuffer() );
+        return Cbor.encode( this.toCborObj() );
+    }
+    toCborObj(): CborArray
+    {
+        if( this.cborRef instanceof SubCborRef ) return Cbor.parse( this.cborRef.toBuffer() ) as CborArray;
+        return new CborArray([ new CborUInt(1) ]);
     }
 
     static fromCbor( cbor: CanBeCborString ): ChainSyncAwaitReply
@@ -48,12 +40,7 @@ export class ChainSyncAwaitReply
             cbor: 
             forceCborString( cbor ).toBuffer();
             
-        const msg = ChainSyncAwaitReply.fromCborObj( Cbor.parse( buff ) );
-
-        // @ts-ignore Cannot assign to 'cborBytes' because it is a read-only property.ts(2540)
-        msg.cborBytes = buff;
-        
-        return msg;
+        return ChainSyncAwaitReply.fromCborObj( Cbor.parse( buff ) );
     }
     static fromCborObj( cbor: CborObj ): ChainSyncAwaitReply
     {

@@ -1,5 +1,6 @@
-import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
+import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborUInt, SubCborRef, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
 import { ChainPoint, IChainPoint, isIChainPoint } from "../../types/ChainPoint";
+import { getSubCborRef, subCborRefOrUndef } from "../../utils/getSubCborRef";
 
 export interface IBlockFetchRequestRange {
     from: IChainPoint,
@@ -12,38 +13,35 @@ export class BlockFetchRequestRange
     readonly from: ChainPoint;
     readonly to: ChainPoint;
 
-    constructor({ from, to }: IBlockFetchRequestRange)
+    constructor(
+        range: IBlockFetchRequestRange,
+        readonly cborRef: SubCborRef | undefined = undefined
+    )
     {
+        const { from, to } = range;
         if(!(
             isIChainPoint( from ) &&
             isIChainPoint( to )
         )) throw new Error("invalid chain points for 'BlockFetchRequestRange'");
 
-        Object.defineProperties(
-            this, {
-                from: {
-                    value: new ChainPoint( from ),
-                    writable: false,
-                    enumerable: true,
-                    configurable: false
-                },
-                to: {
-                    value: new ChainPoint( to ),
-                    writable: false,
-                    enumerable: true,
-                    configurable: false
-                }
-            }
-        )
+        this.from = from instanceof ChainPoint ? from : new ChainPoint( from );
+        this.to = to instanceof ChainPoint ? to : new ChainPoint( to );
+        this.cborRef = cborRef ?? subCborRefOrUndef( range );
     }
 
-
+    toCborBytes(): Uint8Array
+    {
+        if( this.cborRef instanceof SubCborRef ) return this.cborRef.toBuffer();
+        return this.toCbor().toBuffer();
+    }
     toCbor(): CborString
     {
+        if( this.cborRef instanceof SubCborRef ) return new CborString( this.cborRef.toBuffer() );
         return Cbor.encode( this.toCborObj() );
     }
     toCborObj(): CborArray
     {
+        if( this.cborRef instanceof SubCborRef ) return Cbor.parse( this.cborRef.toBuffer() ) as CborArray;
         return new CborArray([
             new CborUInt(0),
             this.from.toCborObj(),
@@ -53,9 +51,16 @@ export class BlockFetchRequestRange
 
     static fromcCbor( cbor: CanBeCborString ): BlockFetchRequestRange
     {
-        return BlockFetchRequestRange.fromCborObj( Cbor.parse( forceCborString( cbor ) ) );
+        const bytes = cbor instanceof Uint8Array ? cbor : forceCborString( cbor ).toBuffer();
+        return BlockFetchRequestRange.fromCborObj(
+            Cbor.parse( bytes, { keepRef: true } ),
+            bytes
+        );
     }
-    static fromCborObj( cbor: CborObj ): BlockFetchRequestRange
+    static fromCborObj(
+        cbor: CborObj,
+        originalBytes: Uint8Array | undefined = undefined
+    ): BlockFetchRequestRange
     {
         if(!(
             cbor instanceof CborArray &&
@@ -69,6 +74,6 @@ export class BlockFetchRequestRange
         return new BlockFetchRequestRange({
             from: ChainPoint.fromCborObj( fromCbor ),
             to: ChainPoint.fromCborObj( toCbor )
-        });
+        }, getSubCborRef( cbor, originalBytes ));
     }
 }

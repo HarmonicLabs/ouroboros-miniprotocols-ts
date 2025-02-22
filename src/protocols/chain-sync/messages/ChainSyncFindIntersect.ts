@@ -1,6 +1,6 @@
-import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
+import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborUInt, SubCborRef, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
 import { ChainPoint, IChainPoint, isIChainPoint } from "../../types/ChainPoint";
-import { getCborBytesDescriptor } from "../../utils/getCborBytesDescriptor";
+import { getSubCborRef, subCborRefOrUndef } from "../../utils/getSubCborRef";
 
 export interface IChainSyncFindIntersect {
     points: readonly IChainPoint[]
@@ -9,29 +9,23 @@ export interface IChainSyncFindIntersect {
 export class ChainSyncFindIntersect
     implements ToCbor, ToCborObj, IChainSyncFindIntersect
 {
-    readonly cborBytes?: Uint8Array | undefined;
-    
     readonly points: readonly ChainPoint[];
 
-    constructor({ points }: IChainSyncFindIntersect)
+    constructor(
+        ask: IChainSyncFindIntersect,
+        readonly cborRef: SubCborRef | undefined = undefined
+    )
     {
+        const { points } = ask;
         if(!(
             Array.isArray( points ) && points.every( isIChainPoint )
         )) throw new Error("invalid IMessageFindIntesect interface");
 
-        Object.defineProperty(
-            this, "points", {
-                value: Object.freeze( points.map( p => new ChainPoint( p ) ) ),
-                writable: false,
-                enumerable: true,
-                configurable: false
-            }
-        );
-        Object.defineProperty(
-            this, "cborBytes", getCborBytesDescriptor()
-        );
+        this.points = points.map( p => p instanceof ChainPoint ? p : new ChainPoint( p ) );
+        this.cborRef = cborRef ?? subCborRefOrUndef( ask );
     }
 
+    toJSON() { return this.toJson(); }
     toJson()
     {
         return {
@@ -39,27 +33,25 @@ export class ChainSyncFindIntersect
         }
     }
 
+    toCborBytes(): Uint8Array
+    {
+        if( this.cborRef instanceof SubCborRef ) return this.cborRef.toBuffer();
+        return this.toCbor().toBuffer();
+    }
     toCbor(): CborString
     {
-        return new CborString( this.toCborBytes() );
+        if( this.cborRef instanceof SubCborRef ) return new CborString( this.cborRef.toBuffer() );
+        return Cbor.encode( this.toCborObj() );
     }
     toCborObj(): CborArray
     {
+        if( this.cborRef instanceof SubCborRef ) return Cbor.parse( this.cborRef.toBuffer() ) as CborArray;
         return new CborArray([
             new CborUInt( 4 ),
             new CborArray( this.points.map( p => p.toCborObj() ) )
         ])
     }
-    toCborBytes(): Uint8Array
-    {
-        if(!( this.cborBytes instanceof Uint8Array ))
-        {
-            // @ts-ignore Cannot assign to 'cborBytes' because it is a read-only property.
-            this.cborBytes = Cbor.encode( this.toCborObj() ).toBuffer();
-        }
-
-        return Uint8Array.prototype.slice.call( this.cborBytes );
-    }
+    
 
     static fromCbor( cbor: CanBeCborString ): ChainSyncFindIntersect
     {
@@ -67,14 +59,12 @@ export class ChainSyncFindIntersect
             cbor: 
             forceCborString( cbor ).toBuffer();
             
-        const msg = ChainSyncFindIntersect.fromCborObj( Cbor.parse( buff ) );
-
-        // @ts-ignore Cannot assign to 'cborBytes' because it is a read-only property.ts(2540)
-        msg.cborBytes = buff;
-        
-        return msg;
+        return ChainSyncFindIntersect.fromCborObj( Cbor.parse( buff ), buff );
     }
-    static fromCborObj( cbor: CborObj ): ChainSyncFindIntersect
+    static fromCborObj(
+        cbor: CborObj,
+        originalBytes: Uint8Array | undefined = undefined
+    ): ChainSyncFindIntersect
     {
         if(!(
             cbor instanceof CborArray &&
@@ -88,6 +78,6 @@ export class ChainSyncFindIntersect
 
         return new ChainSyncFindIntersect({
             points: pointsCbor.map( ChainPoint.fromCborObj )
-        });
+        }, getSubCborRef( cbor, originalBytes ));
     }
 }

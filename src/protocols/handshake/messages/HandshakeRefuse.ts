@@ -1,4 +1,4 @@
-import { CborString, Cbor, CborArray, CborUInt, CanBeCborString, CborObj, forceCborString } from "@harmoniclabs/cbor";
+import { CborString, Cbor, CborArray, CborUInt, CanBeCborString, CborObj, forceCborString, ToCborBytes, SubCborRef, ToCborObj, ToCborString } from "@harmoniclabs/cbor";
 import { RefuseReason, refuseReasonFromCborObj } from "./RefuseReason";
 
 export interface IHandshakeRefuse {
@@ -6,21 +6,25 @@ export interface IHandshakeRefuse {
 }
 
 export class HandshakeRefuse
-    implements IHandshakeRefuse
+    implements ToCborObj, ToCborString, ToCborBytes, IHandshakeRefuse
 {
     readonly reason: RefuseReason;
 
     readonly isN2N: boolean = true;
 
     constructor(
-        { reason }: IHandshakeRefuse,
+        refuse: IHandshakeRefuse,
         n2n: boolean = true
     )
     {
-        this.reason = reason;
+        this.reason = refuse.reason;
         this.isN2N = n2n;
     }
 
+    toCborBytes(): Uint8Array
+    {
+        return this.toCbor().toBuffer();
+    }
     toCbor(): CborString
     {
         return Cbor.encode( this.toCborObj() )

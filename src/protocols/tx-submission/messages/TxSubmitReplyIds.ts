@@ -1,4 +1,4 @@
-import { CanBeCborString, Cbor, CborArray, CborBytes, CborObj, CborString, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
+import { CanBeCborString, Cbor, CborArray, CborBytes, CborObj, CborString, CborUInt, ToCbor, ToCborObj, ToCborString, forceCborString } from "@harmoniclabs/cbor";
 import { isObject } from "@harmoniclabs/obj-utils";
 import { canBeUInteger, forceBigUInt, forceUInteger } from "../../types/ints";
 
@@ -34,7 +34,7 @@ export function txIdAndSizeFromCborObj( cbor: CborObj ): ITxIdAndSize
     throw new Error("invalid CBOR for 'ITxIdAndSize'");
 
     return {
-        txId: cbor.array[0].buffer,
+        txId: cbor.array[0].bytes,
         txSize: Number( cbor.array[1].num )
     };
 }
@@ -55,7 +55,7 @@ export function isITxSubmitReplyIds( stuff: any ): stuff is TxSubmitReplyIds
  * The server requests aviable transactions ids
 **/
 export class TxSubmitReplyIds
-    implements ToCbor, ToCborObj, TxSubmitReplyIds
+    implements ToCborString, ToCborObj, TxSubmitReplyIds
 {
     readonly response: readonly Readonly<ITxIdAndSize>[]
     
@@ -78,11 +78,15 @@ export class TxSubmitReplyIds
         )
     }
 
+    toCborBytes(): Uint8Array
+    {
+        return this.toCbor().toBuffer();
+    }
     toCbor(): CborString
     {
         return Cbor.encode( this.toCborObj() );
     }
-    toCborObj()
+    toCborObj(): CborArray
     {
         return new CborArray([
             new CborUInt(1),

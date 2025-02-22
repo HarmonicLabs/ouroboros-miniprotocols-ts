@@ -27,6 +27,10 @@ export class HandshakeAcceptVersion
         this.isN2N = bool( n2n, true );
     }
 
+    toCborBytes(): Uint8Array
+    {
+        return this.toCbor().toBuffer();
+    }
     toCbor(): CborString
     {
         return Cbor.encode( this.toCborObj() );

@@ -1,4 +1,4 @@
-import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborText, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
+import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborText, CborUInt, ToCbor, ToCborObj, ToCborString, forceCborString } from "@harmoniclabs/cbor";
 import { adaptVersionNumberToMode, isExtendedVersionNumber, VersionNumber } from "../../HandshakeVersionTable/VersionNumber";
 
 export interface IRefuseReasonRefuse {
@@ -7,7 +7,7 @@ export interface IRefuseReasonRefuse {
 }
 
 export class RefuseReasonRefuse
-    implements ToCbor, ToCborObj, IRefuseReasonRefuse
+    implements ToCborString, ToCborObj, IRefuseReasonRefuse
 {
     readonly version: VersionNumber;
     readonly errorMessage: string;
@@ -28,6 +28,10 @@ export class RefuseReasonRefuse
         this.isN2N = n2n;
     }
 
+    toCborBytes(): Uint8Array
+    {
+        return this.toCbor().toBuffer();
+    }
     toCbor(): CborString
     {
         return Cbor.encode( this.toCborObj() )

@@ -1,4 +1,4 @@
-import { CanBeCborString, Cbor, CborArray, CborBytes, CborObj, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
+import { CanBeCborString, Cbor, CborArray, CborBytes, CborObj, CborUInt, ToCbor, ToCborBytes, ToCborObj, ToCborString, forceCborString } from "@harmoniclabs/cbor";
 import { isObject } from "@harmoniclabs/obj-utils";
 import { canBeUInteger } from "./ints";
 import { toHex, uint8ArrayEq } from "@harmoniclabs/uint8array-utils";
@@ -51,8 +51,16 @@ export function isRealPoint( point: IChainPoint ): point is IRealPoint
 }
 
 export class ChainPoint
-    implements ToCbor, ToCborObj, IChainPoint
+    implements ToCborObj, ToCborString, ToCborBytes, IChainPoint
 {
+    constructor( chainPoint: IChainPoint )
+    {
+        if( !isIChainPoint( chainPoint ) )
+        throw new Error("invalid IChainPoint interface");
+
+        this.blockHeader = chainPoint.blockHeader ? { ...chainPoint.blockHeader } : undefined;
+    }
+
     readonly blockHeader?: IBlockHeaderHash;
 
     isOrigin(): boolean { return isOriginPoint( this ) }
@@ -62,21 +70,7 @@ export class ChainPoint
         return new ChainPoint({});
     }
 
-    constructor( chainPoint: IChainPoint )
-    {
-        if( !isIChainPoint( chainPoint ) )
-        throw new Error("invalid IChainPoint interface");
-
-        Object.defineProperty(
-            this, "blockHeader", {
-                value: chainPoint.blockHeader ? { ...chainPoint.blockHeader } : undefined,
-                writable: false,
-                enumerable: true,
-                configurable: false
-            }
-        );
-    }
-
+    toJSON() { return this.toJson(); }
     toJson()
     {
         if( this.isOrigin() ) return {};
@@ -94,6 +88,10 @@ export class ChainPoint
         return `(point: ( hash: ${toHex( this.blockHeader!.hash )}, slot: ${this.blockHeader!.slotNumber} ))`
     }
 
+    toCborBytes(): Uint8Array
+    {
+        return this.toCbor().toBuffer();
+    }
     toCbor()
     {
         return Cbor.encode( this.toCborObj() )
@@ -128,7 +126,7 @@ export class ChainPoint
         return new ChainPoint({
             blockHeader: {
                 slotNumber: slot.num,
-                hash: hash.buffer
+                hash: hash.bytes
             }
         });
     }

@@ -1,4 +1,4 @@
-import { CanBeCborString, Cbor, CborArray, CborObj, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
+import { CanBeCborString, Cbor, CborArray, CborObj, CborUInt, ToCbor, ToCborObj, ToCborString, forceCborString } from "@harmoniclabs/cbor";
 import { ChainPoint, IChainPoint, isIChainPoint } from "./ChainPoint";
 import { isObject } from "@harmoniclabs/obj-utils";
 import { canBeUInteger, forceBigUInt } from "./ints";
@@ -18,7 +18,7 @@ export function isIChainTip( stuff: any ): stuff is IChainTip
 }
 
 export class ChainTip
-    implements ToCbor, ToCborObj, IChainTip
+    implements ToCborString, ToCborObj, IChainTip
 {
     readonly point: ChainPoint;
     readonly blockNo: bigint;
@@ -48,6 +48,7 @@ export class ChainTip
         );
     }
 
+    toJSON() { return this.toJson(); }
     toJson()
     {
         return {

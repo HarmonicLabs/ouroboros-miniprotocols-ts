@@ -1,4 +1,4 @@
-import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
+import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborUInt, SubCborRef, ToCbor, ToCborObj, ToCborString, forceCborString } from "@harmoniclabs/cbor";
 import { isObject } from "@harmoniclabs/obj-utils";
 import { IChainPoint, isIChainPoint, ChainPoint } from "../../types/ChainPoint";
 
@@ -12,25 +12,26 @@ export function isIQryAcquire( stuff: any ): stuff is IQryAcquire
 }
 
 export class QryAcquire
-    implements ToCbor, ToCborObj, IQryAcquire
+    implements ToCborString, ToCborObj, IQryAcquire
 {
     readonly point?: ChainPoint;
 
-    constructor( iacquire: IQryAcquire = {} )
+    constructor( acq: IQryAcquire )
     {
-        iacquire = iacquire ?? {};
-        if(!isIQryAcquire( iacquire )) throw new Error("invalid interface for 'QryAcquire'");
+        acq = acq ?? {};
+        if(!isIQryAcquire( acq )) throw new Error("invalid interface for 'QryAcquire'");
 
-        Object.defineProperty(
-            this, "point", {
-                value: iacquire.point ? new ChainPoint( iacquire.point ) : undefined,
-                writable: false,
-                enumerable: true,
-                configurable: false
-            }
+        this.point = (
+            acq.point instanceof ChainPoint ? acq.point :
+            isIChainPoint( acq.point ) ? new ChainPoint( acq.point ) :
+            undefined
         );
     };
 
+    toCborBytes(): Uint8Array
+    {
+        return this.toCbor().toBuffer();
+    }
     toCbor(): CborString
     {
         return Cbor.encode( this.toCborObj() );
@@ -47,9 +48,15 @@ export class QryAcquire
 
     static fromCbor( cbor: CanBeCborString ): QryAcquire
     {
-        return QryAcquire.fromCborObj( Cbor.parse( forceCborString( cbor ) ) );
+        const bytes = cbor instanceof Uint8Array ? cbor : forceCborString( cbor ).toBuffer();
+        return QryAcquire.fromCborObj(
+            Cbor.parse( bytes, { keepRef: false } )
+        );
     }
-    static fromCborObj( cbor: CborObj ): QryAcquire
+    static fromCborObj(
+        cbor: CborObj,
+        originalBytes: Uint8Array | undefined = undefined
+    ): QryAcquire
     {
         if(!(
             cbor instanceof CborArray &&

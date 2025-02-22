@@ -1,4 +1,4 @@
-import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborUInt, forceCborString, ToCbor } from "@harmoniclabs/cbor";
+import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborUInt, forceCborString, ToCbor, ToCborObj, ToCborString } from "@harmoniclabs/cbor";
 import { isObject } from "@harmoniclabs/obj-utils"
 
 const roDescr = Object.freeze({
@@ -24,7 +24,7 @@ export function isITxMonitorReplyGetSizes( stuff: any ): stuff is ITxMonitorRepl
 }
 
 export class TxMonitorReplyGetSizes
-    implements ITxMonitorReplyGetSizes, ToCbor
+    implements ITxMonitorReplyGetSizes, ToCborString, ToCborObj
 {
     readonly mempoolCapacity: number
     readonly mempoolSize: number
@@ -34,29 +34,20 @@ export class TxMonitorReplyGetSizes
     {
         if( !isITxMonitorReplyGetSizes( reply ) ) throw new Error("invalid `ITxMonitorReplyGetSizes`");
 
-        Object.defineProperties(
-            this, {
-                mempoolCapacity: {
-                    value: reply.mempoolCapacity,
-                    ...roDescr
-                },
-                mempoolSize: {
-                    value: reply.mempoolSize,
-                    ...roDescr
-                },
-                nTxs: {
-                    value: reply.nTxs,
-                    ...roDescr
-                },
-            }
-        );
+        this.mempoolCapacity = reply.mempoolCapacity;
+        this.mempoolSize = reply.mempoolSize;
+        this.nTxs = reply.nTxs;
     }
 
+    toCborBytes(): Uint8Array
+    {
+        return this.toCbor().toBuffer();
+    }
     toCbor(): CborString
     {
         return Cbor.encode( this.toCborObj() );
     }
-    toCborObj()
+    toCborObj(): CborArray
     {
         return new CborArray([
             new CborUInt( 10 ),

@@ -1,5 +1,6 @@
-import { CanBeCborString, Cbor, CborArray, CborBytes, CborObj, CborString, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
+import { CanBeCborString, Cbor, CborArray, CborBytes, CborObj, CborString, CborUInt, SubCborRef, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
 import { isObject } from "@harmoniclabs/obj-utils";
+import { getSubCborRef, subCborRefOrUndef } from "../../utils/getSubCborRef";
 
 export interface ILocalTxSubmitSubmit {
     tx: Uint8Array
@@ -15,27 +16,32 @@ export class LocalTxSubmitSubmit
 {
     readonly tx: Uint8Array;
 
-    constructor({ tx }: ILocalTxSubmitSubmit)
+    constructor(
+        msg: ILocalTxSubmitSubmit,
+        readonly cborRef: SubCborRef | undefined = undefined
+    )
     {
+        const tx = msg.tx;
         if(!(tx instanceof Uint8Array))
         throw new Error("invalid interface for 'LocalTxSubmitSubmit'");
 
-        Object.defineProperty(
-            this, "tx", {
-                value: tx,
-                writable: false,
-                enumerable: true,
-                configurable: false
-            }
-        );
+        this.tx = tx;
+        this.cborRef = cborRef ?? subCborRefOrUndef( msg );
     };
 
+    toCborBytes(): Uint8Array
+    {
+        if( this.cborRef instanceof SubCborRef ) return this.cborRef.toBuffer();
+        return this.toCbor().toBuffer();
+    }
     toCbor(): CborString
     {
+        if( this.cborRef instanceof SubCborRef ) return new CborString( this.cborRef.toBuffer() );
         return Cbor.encode( this.toCborObj() );
     }
-    toCborObj()
+    toCborObj(): CborArray
     {
+        if( this.cborRef instanceof SubCborRef ) return Cbor.parse( this.cborRef.toBuffer() ) as CborArray;
         return new CborArray([
             new CborUInt(0),
             new CborBytes( this.tx )
@@ -44,9 +50,13 @@ export class LocalTxSubmitSubmit
 
     static fromCbor( cbor: CanBeCborString ): LocalTxSubmitSubmit
     {
-        return LocalTxSubmitSubmit.fromCborObj( Cbor.parse( forceCborString( cbor ) ) );
+        const bytes = cbor instanceof Uint8Array ? cbor : forceCborString( cbor ).toBuffer();
+        return LocalTxSubmitSubmit.fromCborObj( Cbor.parse( bytes, { keepRef: true } ), bytes );
     }
-    static fromCborObj( cbor: CborObj ): LocalTxSubmitSubmit
+    static fromCborObj(
+        cbor: CborObj,
+        originalBytes: Uint8Array | undefined = undefined
+    ): LocalTxSubmitSubmit
     {
         if(!(
             cbor instanceof CborArray &&
@@ -57,7 +67,7 @@ export class LocalTxSubmitSubmit
         )) throw new Error("invalid CBOR for 'LocalTxSubmitSubmit");
 
         return new LocalTxSubmitSubmit({
-            tx: cbor.array[1].buffer
-        });
+            tx: cbor.array[1].bytes
+        }, getSubCborRef( cbor, originalBytes ));
     }
 }

@@ -1,5 +1,6 @@
-import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
+import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborUInt, SubCborRef, ToCbor, ToCborObj, ToCborString, forceCborString } from "@harmoniclabs/cbor";
 import { isObject } from "@harmoniclabs/obj-utils";
+import { getSubCborRef } from "../../utils/getSubCborRef";
 
 export interface ITxMonitorNextTx {}
 
@@ -9,26 +10,35 @@ export function isITxMonitorNextTx( stuff: any ): stuff is ITxMonitorNextTx
 }
 
 export class TxMonitorNextTx
-    implements ToCbor, ToCborObj, ITxMonitorNextTx
+    implements ToCborString, ToCborObj, ITxMonitorNextTx
 {
     constructor() {};
 
+    toJSON() { return this.toJson(); }
     toJson() { return {}; }
 
+    toCborBytes(): Uint8Array
+    {
+        return this.toCbor().toBuffer();
+    }
     toCbor(): CborString
     {
         return Cbor.encode( this.toCborObj() );
     }
-    toCborObj()
+    toCborObj(): CborArray
     {
         return new CborArray([ new CborUInt(5) ]);
     }
 
     static fromCbor( cbor: CanBeCborString ): TxMonitorNextTx
     {
-        return TxMonitorNextTx.fromCborObj( Cbor.parse( forceCborString( cbor ) ) );
+        const bytes = cbor instanceof Uint8Array ? cbor : forceCborString( cbor ).toBuffer();
+        return TxMonitorNextTx.fromCborObj( Cbor.parse( bytes, { keepRef: true } ), bytes );
     }
-    static fromCborObj( cbor: CborObj ): TxMonitorNextTx
+    static fromCborObj(
+        cbor: CborObj,
+        originalBytes: Uint8Array | undefined = undefined
+    ): TxMonitorNextTx
     {
         if(!(
             cbor instanceof CborArray &&

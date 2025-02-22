@@ -1,6 +1,5 @@
-import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
+import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborUInt, SubCborRef, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
 import { isObject } from "@harmoniclabs/obj-utils";
-import { getCborBytesDescriptor } from "../../utils/getCborBytesDescriptor";
 
 export interface IChainSyncRequestNext{}
 
@@ -12,35 +11,30 @@ export function isIChainSyncRequestNext( stuff: any ): stuff is IChainSyncReques
 export class ChainSyncRequestNext
     implements ToCbor, ToCborObj, IChainSyncRequestNext
 {
-    readonly cborBytes?: Uint8Array | undefined;
-
+    readonly cborRef: SubCborRef | undefined = undefined;
     constructor()
     {
-        Object.defineProperty(
-            this, "cborBytes", getCborBytesDescriptor()
-        );
     };
 
+    toJSON() { return this.toJson(); }
     toJson() { return {}; }
 
-    toCbor(): CborString
-    {
-        return new CborString( this.toCborBytes() );
-    }
-    toCborObj()
-    {
-        return new CborArray([ new CborUInt(0) ]);
-    }
     toCborBytes(): Uint8Array
     {
-        if(!( this.cborBytes instanceof Uint8Array ))
-        {
-            // @ts-ignore Cannot assign to 'cborBytes' because it is a read-only property.
-            this.cborBytes = Cbor.encode( this.toCborObj() ).toBuffer();
-        }
-
-        return Uint8Array.prototype.slice.call( this.cborBytes );
+        if( this.cborRef instanceof SubCborRef ) return this.cborRef.toBuffer();
+        return this.toCbor().toBuffer();
     }
+    toCbor(): CborString
+    {
+        if( this.cborRef instanceof SubCborRef ) return new CborString( this.cborRef.toBuffer() );
+        return Cbor.encode( this.toCborObj() );
+    }
+    toCborObj(): CborArray
+    {
+        if( this.cborRef instanceof SubCborRef ) return Cbor.parse( this.cborRef.toBuffer() ) as CborArray;
+        return new CborArray([ new CborUInt(0) ]);
+    }
+    
 
     static fromCbor( cbor: CanBeCborString ): ChainSyncRequestNext
     {
@@ -48,14 +42,12 @@ export class ChainSyncRequestNext
             cbor: 
             forceCborString( cbor ).toBuffer();
 
-        const msg = ChainSyncRequestNext.fromCborObj( Cbor.parse( buff ) );
-        
-        // @ts-ignore Cannot assign to 'cborBytes' because it is a read-only property.ts(2540)
-        msg.cborBytes = buff;
-        
-        return msg;
+        return ChainSyncRequestNext.fromCborObj( Cbor.parse( buff ), buff );
     }
-    static fromCborObj( cbor: CborObj ): ChainSyncRequestNext
+    static fromCborObj(
+        cbor: CborObj,
+        originalBytes: Uint8Array | undefined = undefined
+    ): ChainSyncRequestNext
     {
         if(!(
             cbor instanceof CborArray &&

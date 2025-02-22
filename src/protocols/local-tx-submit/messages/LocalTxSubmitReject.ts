@@ -1,6 +1,6 @@
-import { CanBeCborString, Cbor, CborArray, CborNegInt, CborObj, CborString, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
+import { CanBeCborString, Cbor, CborArray, CborNegInt, CborObj, CborString, CborUInt, ToCbor, ToCborObj, ToCborString, forceCborString } from "@harmoniclabs/cbor";
 import { isObject } from "@harmoniclabs/obj-utils";
-import { canBeInteger } from "../../types/ints";
+import { canBeInteger, forceBigUInt } from "../../types/ints";
 
 export interface ILocalTxSubmitReject {
     reason: number | bigint
@@ -12,7 +12,7 @@ export function isILocalTxSubmitReject( stuff: any ): stuff is ILocalTxSubmitRej
 }
 
 export class LocalTxSubmitReject
-    implements ToCbor, ToCborObj, ILocalTxSubmitReject
+    implements ToCborString, ToCborObj, ILocalTxSubmitReject
 {
     readonly reason: bigint;
 
@@ -21,21 +21,18 @@ export class LocalTxSubmitReject
         if(!isILocalTxSubmitReject({ reason }))
         throw new Error("invalid interface for 'LocalTxSubmitReject'");
 
-        Object.defineProperty(
-            this, "reason", {
-                value: typeof reason === "number" ? Math.round( reason ) : BigInt( reason ),
-                writable: false,
-                enumerable: true,
-                configurable: false
-            }
-        );
+        this.reason = forceBigUInt( reason );
     };
 
+    toCborBytes(): Uint8Array
+    {
+        return this.toCbor().toBuffer();
+    }
     toCbor(): CborString
     {
         return Cbor.encode( this.toCborObj() );
     }
-    toCborObj()
+    toCborObj(): CborArray
     {
         return new CborArray([
             new CborUInt(2),

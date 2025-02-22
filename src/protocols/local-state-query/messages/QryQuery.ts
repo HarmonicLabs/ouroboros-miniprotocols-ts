@@ -1,5 +1,6 @@
-import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborUInt, ToCbor, ToCborObj, forceCborString, isCborObj } from "@harmoniclabs/cbor";
+import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborUInt, SubCborRef, ToCbor, ToCborObj, forceCborString, isCborObj } from "@harmoniclabs/cbor";
 import { isObject } from "@harmoniclabs/obj-utils";
+import { getSubCborRef, subCborRefOrUndef } from "../../utils/getSubCborRef";
 
 export interface IQryQuery {
     /**
@@ -15,30 +16,35 @@ export class QryQuery
 {
     readonly query: CborObj;
 
-    constructor({ query }: IQryQuery)
+    constructor(
+        qry: IQryQuery,
+        readonly cborRef: SubCborRef | undefined = undefined
+    )
     {
+        const { query } = qry;
         if(!(
             isCborObj( query )
         )) throw new Error("invalid IQryQuery interface");
 
-        Object.defineProperties(
-            this, {
-                query: {
-                    value: query,
-                    writable: false,
-                    enumerable: true,
-                    configurable: false
-                }
-            }
-        );
+        this.query = query;
+        // only query message to keep track of the original bytes
+        // because data might actually be hashed by the client
+        this.cborRef = cborRef ?? subCborRefOrUndef( qry );
     };
 
+    toCborBytes(): Uint8Array
+    {
+        if( this.cborRef instanceof SubCborRef ) return this.cborRef.toBuffer();
+        return this.toCbor().toBuffer();
+    }
     toCbor(): CborString
     {
+        if( this.cborRef instanceof SubCborRef ) return new CborString( this.cborRef.toBuffer() );
         return Cbor.encode( this.toCborObj() );
     }
-    toCborObj()
+    toCborObj(): CborArray
     {
+        if( this.cborRef instanceof SubCborRef ) return Cbor.parse( this.cborRef.toBuffer() ) as CborArray;
         return new CborArray([
             new CborUInt( 3 ),
             this.query
@@ -47,9 +53,13 @@ export class QryQuery
 
     static fromCbor( cbor: CanBeCborString ): QryQuery
     {
-        return QryQuery.fromCborObj( Cbor.parse( forceCborString( cbor ) ) );
+        const bytes = cbor instanceof Uint8Array ? cbor : forceCborString( cbor ).toBuffer();
+        return QryQuery.fromCborObj( Cbor.parse( bytes, { keepRef: true } ), bytes );
     }
-    static fromCborObj( cbor: CborObj ): QryQuery
+    static fromCborObj(
+        cbor: CborObj,
+        originlBytes: Uint8Array | undefined = undefined
+    ): QryQuery
     {
         if(!(
             cbor instanceof CborArray &&
@@ -62,6 +72,6 @@ export class QryQuery
 
         return new QryQuery({
             query: cbor.array[1]
-        });
+        }, getSubCborRef( cbor, originlBytes ));
     }
 }

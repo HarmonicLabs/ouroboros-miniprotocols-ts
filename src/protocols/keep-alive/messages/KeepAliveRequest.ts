@@ -1,6 +1,5 @@
-import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
+import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborUInt, ToCbor, ToCborObj, ToCborString, forceCborString } from "@harmoniclabs/cbor";
 import { isObject } from "@harmoniclabs/obj-utils";
-import { getCborBytesDescriptor } from "../../utils/getCborBytesDescriptor";
 import { isWord16 } from "../../utils/isWord16";
 
 export interface IKeepAliveRequest {
@@ -13,68 +12,46 @@ export function isIKeepAliveRequest( stuff: any ): stuff is IKeepAliveRequest
 }
 
 export class KeepAliveRequest
-    implements ToCbor, ToCborObj, IKeepAliveRequest
+    implements ToCborString, ToCborObj, IKeepAliveRequest
 {
-    readonly cborBytes?: Uint8Array | undefined;
-
     readonly cookie: number;
     
-    constructor( { cookie }: IKeepAliveRequest )
+    constructor({ cookie }: IKeepAliveRequest )
     {
         if( !isWord16( cookie ) )
         {
             throw new Error("keep alive cookie is not word 16");
         }
 
-        Object.defineProperties( 
-            this, {
-                cborBytes: getCborBytesDescriptor(),
-                cookie: {
-                    value: Number( cookie ),
-                    writable: false,
-                    enumerable: true,
-                    configurable: false
-                }
-            }
-        );
+        this.cookie = Number( cookie ) | 0;
     }
 
+    toJSON() { return this.toJson(); }
     toJson() { return {}; }
 
+    toCborBytes(): Uint8Array
+    {
+        return this.toCbor().toBuffer();
+    }
     toCbor(): CborString
     {
-        return new CborString( this.toCborBytes() );
+        return Cbor.encode( this.toCborObj() );
     }
-    toCborObj()
+    toCborObj(): CborArray
     {
         return new CborArray([
             new CborUInt( 0 ),
             new CborUInt( this.cookie )
         ]);
     }
-    toCborBytes(): Uint8Array
-    {
-        if(!( this.cborBytes instanceof Uint8Array ))
-        {
-            // @ts-ignore Cannot assign to 'cborBytes' because it is a read-only property.
-            this.cborBytes = Cbor.encode( this.toCborObj() ).toBuffer();
-        }
-
-        return Uint8Array.prototype.slice.call( this.cborBytes );
-    }
-
+    
     static fromCbor( cbor: CanBeCborString ): KeepAliveRequest
     {
         const buff = cbor instanceof Uint8Array ?
             cbor: 
             forceCborString( cbor ).toBuffer();
             
-        const msg = KeepAliveRequest.fromCborObj( Cbor.parse( buff ) );
-        
-        // @ts-ignore Cannot assign to 'cborBytes' because it is a read-only property.ts(2540)
-        msg.cborBytes = buff;
-        
-        return msg;
+        return KeepAliveRequest.fromCborObj( Cbor.parse( buff, { keepRef: false } ) );
     }
     static fromCborObj( cbor: CborObj ): KeepAliveRequest
     {

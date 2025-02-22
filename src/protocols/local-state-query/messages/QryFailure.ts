@@ -1,4 +1,4 @@
-import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
+import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborUInt, ToCbor, ToCborObj, ToCborString, forceCborString } from "@harmoniclabs/cbor";
 import { MiniProtocol, miniProtocolToString } from "../../../MiniProtocol";
 
 export enum QryFailureReason {
@@ -18,7 +18,7 @@ export interface IQryFailure {
 }
 
 export class QryFailure
-    implements ToCbor, ToCborObj, IQryFailure
+    implements ToCborString, ToCborObj, IQryFailure
 {
     readonly reason: QryFailureReason;
 
@@ -28,22 +28,10 @@ export class QryFailure
             isQryFailureReason( reason )
         )) throw new Error("invalid IQryFailure interface");
 
-        Object.defineProperties(
-            this, {
-                reason: {
-                    value: reason,
-                    writable: false,
-                    enumerable: true,
-                    configurable: false
-                }
-            }
-        );
+        this.reason = reason;
     };
 
-    toJSON()
-    {
-        return this.toJson();
-    }
+    toJSON() { return this.toJson(); }
     toJson()
     {
         return {
@@ -58,11 +46,15 @@ export class QryFailure
         }
     }
 
+    toCborBytes(): Uint8Array
+    {
+        return this.toCbor().toBuffer();
+    }
     toCbor(): CborString
     {
         return Cbor.encode( this.toCborObj() );
     }
-    toCborObj()
+    toCborObj(): CborArray
     {
         return new CborArray([
             new CborUInt( 2 ),

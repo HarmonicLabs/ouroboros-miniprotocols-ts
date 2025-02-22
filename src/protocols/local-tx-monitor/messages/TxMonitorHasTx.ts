@@ -1,4 +1,4 @@
-import { CanBeCborString, Cbor, CborArray, CborBytes, CborObj, CborString, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
+import { CanBeCborString, Cbor, CborArray, CborBytes, CborObj, CborString, CborUInt, ToCbor, ToCborObj, ToCborString, forceCborString } from "@harmoniclabs/cbor";
 import { hasOwn, isObject } from "@harmoniclabs/obj-utils";
 
 export interface ITxMonitorHasTx {
@@ -11,7 +11,7 @@ export function isITxMonitorHasTx( stuff: any ): stuff is ITxMonitorHasTx
 }
 
 export class TxMonitorHasTx
-    implements ToCbor, ToCborObj, ITxMonitorHasTx
+    implements ToCborString, ToCborObj, ITxMonitorHasTx
 {
     readonly txId: Uint8Array;
     
@@ -20,21 +20,18 @@ export class TxMonitorHasTx
         if(!isITxMonitorHasTx({ txId }))
         throw new Error("invalid interface for 'TxMonitorHasTx'");
 
-        Object.defineProperty(
-            this, "txId", {
-                value: txId,
-                writable: false,
-                enumerable: true,
-                configurable: false
-            }
-        );
+        this.txId = txId;
     };
 
+    toCborBytes(): Uint8Array
+    {
+        return this.toCbor().toBuffer();
+    }
     toCbor(): CborString
     {
         return Cbor.encode( this.toCborObj() );
     }
-    toCborObj()
+    toCborObj(): CborArray
     {
         return new CborArray([
             new CborUInt( 7 ),
@@ -57,7 +54,7 @@ export class TxMonitorHasTx
         )) throw new Error("invalid CBOR for 'TxMonitorHasTx");
 
         return new TxMonitorHasTx({
-            txId: cbor.array[1].buffer
+            txId: cbor.array[1].bytes
         });
     }
 }

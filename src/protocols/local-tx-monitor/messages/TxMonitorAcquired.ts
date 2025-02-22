@@ -1,4 +1,4 @@
-import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
+import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborUInt, ToCbor, ToCborObj, ToCborString, forceCborString } from "@harmoniclabs/cbor";
 import { isObject } from "@harmoniclabs/obj-utils";
 import { canBeUInteger, forceBigUInt } from "../../types/ints";
 
@@ -12,7 +12,7 @@ export function isITxMonitorAcquired( stuff: any ): stuff is ITxMonitorAcquired
 }
 
 export class TxMonitorAcquired
-    implements ToCbor, ToCborObj, ITxMonitorAcquired
+    implements ToCborString, ToCborObj, ITxMonitorAcquired
 {
     readonly slotNumber: bigint;
     
@@ -21,21 +21,18 @@ export class TxMonitorAcquired
         if(!isITxMonitorAcquired({ slotNumber }))
         throw new Error("invalid interface for 'TxMonitorAcquired'");
 
-        Object.defineProperty(
-            this, "slotNumber", {
-                value: forceBigUInt( slotNumber ),
-                writable: false,
-                enumerable: true,
-                configurable: false
-            }
-        );
+        this.slotNumber = forceBigUInt( slotNumber );
     };
 
+    toCborBytes(): Uint8Array
+    {
+        return this.toCbor().toBuffer();
+    }
     toCbor(): CborString
     {
         return Cbor.encode( this.toCborObj() );
     }
-    toCborObj()
+    toCborObj(): CborArray
     {
         return new CborArray([
             new CborUInt( 2 ),

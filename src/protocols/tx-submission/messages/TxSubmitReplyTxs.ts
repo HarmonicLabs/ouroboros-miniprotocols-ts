@@ -1,5 +1,6 @@
-import { CanBeCborString, Cbor, CborArray, CborBytes, CborObj, CborString, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
+import { CanBeCborString, Cbor, CborArray, CborBytes, CborObj, CborString, CborUInt, SubCborRef, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
 import { isObject } from "@harmoniclabs/obj-utils"
+import { getSubCborRef, subCborRefOrUndef } from "../../utils/getSubCborRef";
 
 export interface ITxSubmitReplyTxs {
     txs: Uint8Array[] | readonly Uint8Array[]
@@ -17,19 +18,31 @@ export class TxSubmitReplyTxs
 {
     readonly txs: readonly Uint8Array[];
 
-    constructor({ txs }: ITxSubmitReplyTxs)
+    constructor(
+        msg: ITxSubmitReplyTxs,
+        readonly cborRef: SubCborRef | undefined = undefined
+    )
     {
+        const txs = msg.txs;
         if(!isITxSubmitReplyTx({ txs })) throw new Error("invalid interface for 'TxSubmitReplyTx'");
 
         this.txs = txs;
+        this.cborRef = cborRef ?? subCborRefOrUndef( msg );
     }
 
+    toCborBytes(): Uint8Array
+    {
+        if( this.cborRef instanceof SubCborRef ) return this.cborRef.toBuffer();
+        return this.toCbor().toBuffer();
+    }
     toCbor(): CborString
     {
+        if( this.cborRef instanceof SubCborRef ) return new CborString( this.cborRef.toBuffer() );
         return Cbor.encode( this.toCborObj() );
     }
-    toCborObj()
+    toCborObj(): CborArray
     {
+        if( this.cborRef instanceof SubCborRef ) return Cbor.parse( this.cborRef.toBuffer() ) as CborArray;
         return new CborArray([
             new CborUInt(3),
             new CborArray(
@@ -45,9 +58,13 @@ export class TxSubmitReplyTxs
 
     static fromCbor( cbor: CanBeCborString ): TxSubmitReplyTxs
     {
-        return TxSubmitReplyTxs.fromCborObj( Cbor.parse( forceCborString( cbor ) ) );
+        const bytes = cbor instanceof Uint8Array ? cbor : forceCborString( cbor ).toBuffer();
+        return TxSubmitReplyTxs.fromCborObj( Cbor.parse( bytes, { keepRef: true } ), bytes );
     }
-    static fromCborObj( cbor: CborObj ): TxSubmitReplyTxs
+    static fromCborObj(
+        cbor: CborObj,
+        originalBytes: Uint8Array | undefined = undefined
+    ): TxSubmitReplyTxs
     {
         if(!(
             cbor instanceof CborArray &&
@@ -59,7 +76,7 @@ export class TxSubmitReplyTxs
         )) throw new Error("invalid CBOR for 'TxSubmitReplyTx");
 
         return new TxSubmitReplyTxs({
-            txs: cbor.array[1].array.map( id => (id as CborBytes).buffer )
-        });
+            txs: cbor.array[1].array.map( id => (id as CborBytes).bytes )
+        }, getSubCborRef( cbor, originalBytes ));
     }
 }

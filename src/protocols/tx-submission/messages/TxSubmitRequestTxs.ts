@@ -1,4 +1,4 @@
-import { CanBeCborString, Cbor, CborArray, CborBytes, CborObj, CborString, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
+import { CanBeCborString, Cbor, CborArray, CborBytes, CborObj, CborString, CborUInt, ToCbor, ToCborObj, ToCborString, forceCborString } from "@harmoniclabs/cbor";
 import { isObject } from "@harmoniclabs/obj-utils"
 import { assert } from "../../utils/assert";
 
@@ -20,7 +20,7 @@ export function isITxSubmitRequestTxs( stuff: any ): stuff is ITxSubmitRequestTx
  * Server request of available transactions
 **/
 export class TxSubmitRequestTxs
-    implements ToCbor, ToCborObj, ITxSubmitRequestTxs
+    implements ToCborString, ToCborObj, ITxSubmitRequestTxs
 {
     readonly ids: Uint8Array[];
 
@@ -31,11 +31,15 @@ export class TxSubmitRequestTxs
         this.ids = ids;
     }
 
+    toCborBytes(): Uint8Array
+    {
+        return this.toCbor().toBuffer();
+    }
     toCbor(): CborString
     {
         return Cbor.encode( this.toCborObj() );
     }
-    toCborObj()
+    toCborObj(): CborArray
     {
         return new CborArray([
             new CborUInt( 2 ),
@@ -73,7 +77,7 @@ export class TxSubmitRequestTxs
         )) throw new Error("invalid CBOR for 'TxSubmitRequestTxs");
 
         return new TxSubmitRequestTxs({
-            ids: cborIds.array.map( ( id ) => ( id as CborBytes ).buffer )
+            ids: cborIds.array.map( ( id ) => ( id as CborBytes ).bytes )
         });
     }
 }

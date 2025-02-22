@@ -1,4 +1,4 @@
-import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborUInt, forceCborString, ToCbor } from "@harmoniclabs/cbor";
+import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborUInt, forceCborString, ToCbor, ToCborObj, ToCborString } from "@harmoniclabs/cbor";
 import { isWord16 } from "../../utils/isWord16";
 import { isWord32 } from "../../utils/isWord32";
 
@@ -15,7 +15,7 @@ export function isIPeerAddressIPv4( peerAddress: any ): peerAddress is IPeerAddr
     );
 }
 
-export class PeerAddressIPv4 implements IPeerAddressIPv4, ToCbor
+export class PeerAddressIPv4 implements IPeerAddressIPv4, ToCborString, ToCborObj
 {
     readonly address: number;
     readonly portNumber: number | bigint;
@@ -25,24 +25,14 @@ export class PeerAddressIPv4 implements IPeerAddressIPv4, ToCbor
         if(!( isIPeerAddressIPv4( newPeerAddress ) ))
             throw new Error( "invalid new `IPeerAddressIPv4` data provided" );
 
-        Object.defineProperties(
-            this, {
-                address: {
-                    value: Number( newPeerAddress.address ),
-                    writable: false,
-                    enumerable: true,
-                    configurable: false
-                },
-                portNumber: {
-                    value: newPeerAddress.portNumber,
-                    writable: false,
-                    enumerable: true,
-                    configurable: false
-                }
-            }
-        );
+        this.address = Number( newPeerAddress.address ) >>> 0;
+        this.portNumber = newPeerAddress.portNumber;
     }
 
+    toCborBytes(): Uint8Array
+    {
+        return this.toCbor().toBuffer();
+    }
     toCbor(): CborString
     {
         return Cbor.encode( this.toCborObj() );

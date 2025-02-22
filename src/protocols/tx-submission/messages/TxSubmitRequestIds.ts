@@ -1,4 +1,4 @@
-import { CanBeCborString, Cbor, CborArray, CborObj, CborSimple, CborString, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
+import { CanBeCborString, Cbor, CborArray, CborObj, CborSimple, CborString, CborUInt, ToCbor, ToCborObj, ToCborString, forceCborString } from "@harmoniclabs/cbor";
 import { canBeUInteger, forceUInteger } from "../../types/ints";
 import { isObject } from "@harmoniclabs/obj-utils";
 import { assert } from "../../utils/assert";
@@ -24,7 +24,7 @@ export function isITxSubmitRequestIds( stuff: any ): stuff is TxSubmitRequestIds
  * Server request of available transactions ids
 **/
 export class TxSubmitRequestIds
-    implements ToCbor, ToCborObj, ITxSubmitRequestIds
+    implements ToCborString, ToCborObj, ITxSubmitRequestIds
 {
     readonly blocking: boolean;
     readonly knownTxCount: number;
@@ -49,11 +49,15 @@ export class TxSubmitRequestIds
         this.requestedTxCount = forceUInteger( requestedTxCount );
     }
 
+    toCborBytes(): Uint8Array
+    {
+        return this.toCbor().toBuffer();
+    }
     toCbor(): CborString
     {
         return Cbor.encode( this.toCborObj() );
     }
-    toCborObj()
+    toCborObj(): CborArray
     {
         return new CborArray([
             new CborUInt( 0 ),

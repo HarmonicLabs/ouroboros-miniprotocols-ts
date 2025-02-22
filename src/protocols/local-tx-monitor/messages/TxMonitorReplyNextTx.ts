@@ -1,5 +1,6 @@
-import { CanBeCborString, Cbor, CborArray, CborBytes, CborObj, CborString, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
+import { CanBeCborString, Cbor, CborArray, CborBytes, CborObj, CborString, CborUInt, SubCborRef, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
 import { hasOwn, isObject } from "@harmoniclabs/obj-utils";
+import { getSubCborRef, subCborRefOrUndef } from "../../utils/getSubCborRef";
 
 export interface ITxMonitorReplyNextTx {
     tx?: Uint8Array
@@ -15,27 +16,32 @@ export class TxMonitorReplyNextTx
 {
     readonly tx?: Uint8Array;
     
-    constructor({ tx }: ITxMonitorReplyNextTx )
+    constructor(
+        msg: ITxMonitorReplyNextTx,
+        readonly cborRef: SubCborRef | undefined = undefined
+    )
     {
+        const { tx } = msg;
         if(!isITxMonitorReplyNextTx({ tx }))
         throw new Error("invalid interface for 'TxMonitorReplyNextTx'");
 
-        Object.defineProperty(
-            this, "tx", {
-                value: tx ?? undefined,
-                writable: false,
-                enumerable: true,
-                configurable: false
-            }
-        );
+        this.tx = tx;
+        this.cborRef = cborRef ?? subCborRefOrUndef( msg );
     };
 
+    toCborBytes(): Uint8Array
+    {
+        if( this.cborRef instanceof SubCborRef ) return this.cborRef.toBuffer();
+        return this.toCbor().toBuffer();
+    }
     toCbor(): CborString
     {
+        if( this.cborRef instanceof SubCborRef ) return new CborString( this.cborRef.toBuffer() );
         return Cbor.encode( this.toCborObj() );
     }
-    toCborObj()
+    toCborObj(): CborArray
     {
+        if( this.cborRef instanceof SubCborRef ) return Cbor.parse( this.cborRef.toBuffer() ) as CborArray;
         const arr: CborObj[] = [ new CborUInt( 6 ) ];
         if( this.tx ) arr.push( new CborBytes( this.tx ) );
         return new CborArray( arr );
@@ -43,9 +49,13 @@ export class TxMonitorReplyNextTx
 
     static fromCbor( cbor: CanBeCborString ): TxMonitorReplyNextTx
     {
-        return TxMonitorReplyNextTx.fromCborObj( Cbor.parse( forceCborString( cbor ) ) );
+        const bytes = cbor instanceof Uint8Array ? cbor : forceCborString( cbor ).toBuffer();
+        return TxMonitorReplyNextTx.fromCborObj( Cbor.parse( bytes, { keepRef: true } ), bytes );
     }
-    static fromCborObj( cbor: CborObj ): TxMonitorReplyNextTx
+    static fromCborObj(
+        cbor: CborObj,
+        originalBytes: Uint8Array | undefined = undefined
+    ): TxMonitorReplyNextTx
     {
         if(!(
             cbor instanceof CborArray &&
@@ -62,9 +72,9 @@ export class TxMonitorReplyNextTx
             if(!( cbor.array[1] instanceof CborBytes ))
             throw new Error("invalid CBOR for 'TxMonitorReplyNextTx");
 
-            reply.tx = cbor.array[1].buffer;
+            reply.tx = cbor.array[1].bytes;
         }
 
-        return new TxMonitorReplyNextTx( reply );
+        return new TxMonitorReplyNextTx( reply, getSubCborRef( cbor, originalBytes ) );
     }
 }

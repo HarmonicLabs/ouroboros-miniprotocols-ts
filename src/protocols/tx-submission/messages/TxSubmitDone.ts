@@ -1,4 +1,4 @@
-import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
+import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborUInt, ToCbor, ToCborObj, ToCborString, forceCborString } from "@harmoniclabs/cbor";
 import { isObject } from "@harmoniclabs/obj-utils";
 
 export interface ITxSubmitDone {}
@@ -9,17 +9,22 @@ export function isITxSubmitDone( stuff: any ): stuff is ITxSubmitDone
 }
 
 export class TxSubmitDone
-    implements ToCbor, ToCborObj, ITxSubmitDone
+    implements ToCborString, ToCborObj, ITxSubmitDone
 {
     constructor() {};
 
+    toJSON() { return this.toJson(); }
     toJson() { return {}; }
 
+    toCborBytes(): Uint8Array
+    {
+        return this.toCbor().toBuffer();
+    }
     toCbor(): CborString
     {
         return Cbor.encode( this.toCborObj() );
     }
-    toCborObj()
+    toCborObj(): CborArray
     {
         return new CborArray([ new CborUInt(4) ]);
     }

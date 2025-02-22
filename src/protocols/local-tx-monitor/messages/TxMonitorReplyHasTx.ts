@@ -1,4 +1,4 @@
-import { CanBeCborString, Cbor, CborArray, CborObj, CborSimple, CborString, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
+import { CanBeCborString, Cbor, CborArray, CborObj, CborSimple, CborString, CborUInt, ToCbor, ToCborObj, ToCborString, forceCborString } from "@harmoniclabs/cbor";
 import { isObject } from "@harmoniclabs/obj-utils";
 
 export interface ITxMonitorReplyHasTx {
@@ -11,7 +11,7 @@ export function isITxMonitorReplyHasTx( stuff: any ): stuff is ITxMonitorReplyHa
 }
 
 export class TxMonitorReplyHasTx
-    implements ToCbor, ToCborObj, ITxMonitorReplyHasTx
+    implements ToCborString, ToCborObj, ITxMonitorReplyHasTx
 {
     readonly hasTx: boolean;
     
@@ -20,21 +20,18 @@ export class TxMonitorReplyHasTx
         if(!isITxMonitorReplyHasTx({ hasTx }))
         throw new Error("invalid interface for 'TxMonitorReplyHasTx'");
 
-        Object.defineProperty(
-            this, "hasTx", {
-                value: hasTx,
-                writable: false,
-                enumerable: true,
-                configurable: false
-            }
-        );
+        this.hasTx = hasTx;
     };
 
+    toCborBytes(): Uint8Array
+    {
+        return this.toCbor().toBuffer();
+    }
     toCbor(): CborString
     {
         return Cbor.encode( this.toCborObj() );
     }
-    toCborObj()
+    toCborObj(): CborArray
     {
         return new CborArray([
             new CborUInt( 8 ),

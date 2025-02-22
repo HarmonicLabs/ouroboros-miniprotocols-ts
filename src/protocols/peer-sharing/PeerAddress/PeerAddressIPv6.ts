@@ -1,4 +1,4 @@
-import { Cbor, CborArray, CborObj, CborString, CborUInt, ToCbor } from "@harmoniclabs/cbor";
+import { Cbor, CborArray, CborObj, CborString, CborUInt, ToCbor, ToCborObj, ToCborString } from "@harmoniclabs/cbor";
 import { isWord16 } from "../../utils/isWord16";
 import { isWord32 } from "../../utils/isWord32";
 import { hasOwn } from "@harmoniclabs/obj-utils";
@@ -46,7 +46,7 @@ export function isIPeerAddressIPv6( peerAddress: any ): peerAddress is IPeerAddr
 }
 
 export class PeerAddressIPv6
-    implements IPeerAddressIPv6, ToCbor
+    implements IPeerAddressIPv6, ToCborString, ToCborObj
 {
     readonly address: RawIPv6;
     readonly flowInfo: number | undefined;
@@ -94,6 +94,10 @@ export class PeerAddressIPv6
         );        
     }
 
+    toCborBytes(): Uint8Array
+    {
+        return this.toCbor().toBuffer();
+    }
     toCbor(): CborString
     {
         return Cbor.encode( this.toCborObj() );

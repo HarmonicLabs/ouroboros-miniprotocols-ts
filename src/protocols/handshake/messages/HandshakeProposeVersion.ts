@@ -20,6 +20,10 @@ export class HandshakeProposeVersion
         this.isN2N = n2n;
     }
 
+    toCborBytes(): Uint8Array
+    {
+        return this.toCbor().toBuffer();
+    }
     toCbor(): CborString
     {
         return Cbor.encode( this.toCborObj() );

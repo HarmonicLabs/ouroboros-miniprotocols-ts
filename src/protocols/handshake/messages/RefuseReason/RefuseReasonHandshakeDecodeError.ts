@@ -1,4 +1,4 @@
-import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborText, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
+import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborText, CborUInt, ToCbor, ToCborObj, ToCborString, forceCborString } from "@harmoniclabs/cbor";
 import { adaptVersionNumberToMode, isExtendedVersionNumber, isVersionNumber, VersionNumber } from "../../HandshakeVersionTable/VersionNumber";
 
 export interface IRefuseReasonHandshakeDecodeError {
@@ -7,7 +7,7 @@ export interface IRefuseReasonHandshakeDecodeError {
 }
 
 export class RefuseReasonHandshakeDecodeError
-    implements ToCbor, ToCborObj, IRefuseReasonHandshakeDecodeError
+    implements ToCborString, ToCborObj, IRefuseReasonHandshakeDecodeError
 {
     readonly version: VersionNumber;
     readonly decodeError: string;
@@ -28,6 +28,10 @@ export class RefuseReasonHandshakeDecodeError
         this.isN2N = n2n;
     }
 
+    toCborBytes(): Uint8Array
+    {
+        return this.toCbor().toBuffer();
+    }
     toCbor(): CborString
     {
         return Cbor.encode( this.toCborObj() )

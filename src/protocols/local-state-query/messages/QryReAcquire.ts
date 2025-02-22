@@ -1,4 +1,4 @@
-import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
+import { CanBeCborString, Cbor, CborArray, CborObj, CborString, CborUInt, ToCbor, ToCborObj, ToCborString, forceCborString } from "@harmoniclabs/cbor";
 import { isObject } from "@harmoniclabs/obj-utils";
 import { ChainPoint, IChainPoint, isIChainPoint } from "../../types/ChainPoint";
 
@@ -12,25 +12,22 @@ export function isIQryReAcquire( stuff: any ): stuff is IQryReAcquire
 }
 
 export class QryReAcquire
-    implements ToCbor, ToCborObj, IQryReAcquire
+    implements ToCborString, ToCborObj, IQryReAcquire
 {
     readonly point?: ChainPoint;
 
-    constructor( iacquire: IQryReAcquire = {} )
+    constructor( acq: IQryReAcquire = {} )
     {
-        iacquire = iacquire ?? {};
-        if(!isIQryReAcquire( iacquire )) throw new Error("invalid interface for 'QryReAcquire'");
+        acq = acq ?? {};
+        if(!isIQryReAcquire( acq )) throw new Error("invalid interface for 'QryReAcquire'");
 
-        Object.defineProperty(
-            this, "point", {
-                value: iacquire.point ? new ChainPoint( iacquire.point ) : undefined,
-                writable: false,
-                enumerable: true,
-                configurable: false
-            }
-        );
+        this.point = isIChainPoint( acq.point ) ? new ChainPoint( acq.point ) : undefined;
     };
 
+    toCborBytes(): Uint8Array
+    {
+        return this.toCbor().toBuffer();
+    }
     toCbor(): CborString
     {
         return Cbor.encode( this.toCborObj() );

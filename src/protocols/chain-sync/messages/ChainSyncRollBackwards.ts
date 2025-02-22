@@ -1,7 +1,7 @@
-import { CanBeCborString, Cbor, CborArray, CborBytes, CborObj, CborString, CborTag, CborUInt, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
+import { CanBeCborString, Cbor, CborArray, CborBytes, CborObj, CborString, CborTag, CborUInt, SubCborRef, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
 import { ChainPoint, IChainPoint, isIChainPoint } from "../../types/ChainPoint";
 import { ChainTip, IChainTip, isIChainTip } from "../../types/ChainTip";
-import { getCborBytesDescriptor } from "../../utils/getCborBytesDescriptor";
+import { getSubCborRef, subCborRefOrUndef } from "../../utils/getSubCborRef";
 
 export interface IChainSyncRollBackwards {
     point: IChainPoint,
@@ -11,37 +11,26 @@ export interface IChainSyncRollBackwards {
 export class ChainSyncRollBackwards
     implements ToCbor, ToCborObj, IChainSyncRollBackwards
 {
-    readonly cborBytes?: Uint8Array | undefined;
-    
     readonly point: ChainPoint;
     readonly tip: ChainTip;
 
-    constructor({ point, tip }: IChainSyncRollBackwards)
+    constructor(
+        rollback: IChainSyncRollBackwards,
+        readonly cborRef: SubCborRef | undefined = undefined
+    )
     {
+        const { point, tip } = rollback;
         if(!(
             isIChainPoint( point ) &&
             isIChainTip( tip )
         )) throw new Error("invalid IChainSyncRollBackwards interface");
 
-        Object.defineProperties(
-            this, {
-                cborBytes: getCborBytesDescriptor(),
-                point: {
-                    value: new ChainPoint( point ),
-                    writable: false,
-                    enumerable: true,
-                    configurable: false
-                },
-                tip: {
-                    value: new ChainTip( tip ),
-                    writable: false,
-                    enumerable: true,
-                    configurable: false
-                }
-            }
-        );
+        this.point = point instanceof ChainPoint ? point : new ChainPoint( point );
+        this.tip = tip instanceof ChainTip ? tip : new ChainTip( tip );
+        this.cborRef = cborRef ?? subCborRefOrUndef( rollback );
     };
 
+    toJSON() { return this.toJson(); }
     toJson()
     {
         return {
@@ -50,43 +39,38 @@ export class ChainSyncRollBackwards
         };
     }
     
+    toCborBytes(): Uint8Array
+    {
+        if( this.cborRef instanceof SubCborRef ) return this.cborRef.toBuffer();
+        return this.toCbor().toBuffer();
+    }
     toCbor(): CborString
     {
-        return new CborString( this.toCborBytes() );
+        if( this.cborRef instanceof SubCborRef ) return new CborString( this.cborRef.toBuffer() );
+        return Cbor.encode( this.toCborObj() );
     }
-    toCborObj()
+    toCborObj(): CborArray
     {
+        if( this.cborRef instanceof SubCborRef ) return Cbor.parse( this.cborRef.toBuffer() ) as CborArray;
         return new CborArray([
             new CborUInt(3),
             this.point.toCborObj(),
             this.tip.toCborObj()
         ]);
     }
-    toCborBytes(): Uint8Array
-    {
-        if(!( this.cborBytes instanceof Uint8Array ))
-        {
-            // @ts-ignore Cannot assign to 'cborBytes' because it is a read-only property.
-            this.cborBytes = Cbor.encode( this.toCborObj() ).toBuffer();
-        }
-
-        return Uint8Array.prototype.slice.call( this.cborBytes );
-    }
-
+    
     static fromCbor( cbor: CanBeCborString ): ChainSyncRollBackwards
     {
         const buff = cbor instanceof Uint8Array ?
             cbor: 
             forceCborString( cbor ).toBuffer();
             
-        const msg = ChainSyncRollBackwards.fromCborObj( Cbor.parse( buff ) );
-        
-        // @ts-ignore Cannot assign to 'cborBytes' because it is a read-only property.ts(2540)
-        msg.cborBytes = buff;
-        
-        return msg;
+        return ChainSyncRollBackwards.fromCborObj( Cbor.parse( buff ), buff );
     }
-    static fromCborObj( cbor: CborObj ): ChainSyncRollBackwards
+    static fromCborObj(
+        cbor: CborObj,
+        originalBytes: Uint8Array | undefined = undefined
+    ): ChainSyncRollBackwards
     {
         if(!(
             cbor instanceof CborArray &&
@@ -100,6 +84,6 @@ export class ChainSyncRollBackwards
         return new ChainSyncRollBackwards({
             point: ChainPoint.fromCborObj( pointCbor ),
             tip: ChainTip.fromCborObj( tipCbor )
-        });
+        }, getSubCborRef( cbor, originalBytes ));
     }
 }
