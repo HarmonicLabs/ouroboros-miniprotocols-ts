@@ -30,25 +30,22 @@ export class CborCodec extends ServiceMap.Service<CborCodec, {
 ) {
   // Attach a static layer to the service, which will be used to provide an
   // implementation of the service.
-  static readonly layer = Layer.effect(
+  static readonly layer = Layer.sync(
     CborCodec,
-    Effect.gen(function*() {
-      // Define the service methods using Effect.fn
-      const encode = Effect.fn("CborCodec.encode")(function*(obj: CborObj) {
+    () => CborCodec.of({
+      encode: Effect.fn("CborCodec.encode")(function*(obj: CborObj) {
         return yield* Effect.try({
           try: () => Cbor.encode(obj).toBuffer(),
           catch: (error) => new CborCodecError({ cause: error })
         })
-      })
-
-      const decode = Effect.fn("CborCodec.decode")(function*(bytes: Uint8Array) {
+      }),
+      decode: Effect.fn("CborCodec.decode")(function*(bytes: Uint8Array) {
         return yield* Effect.try({
           try: () => Cbor.parse(bytes),
           catch: (error) => new CborCodecError({ cause: error })
         })
-      })
-
-      const encodeValid = Effect.fn("CborCodec.encodeValid")(function*<S extends Schema.Top>(
+      }),
+      encodeValid: Effect.fn("CborCodec.encodeValid")(function*<S extends Schema.Top>(
         obj: unknown,
         schema: S
       ) {
@@ -59,9 +56,8 @@ export class CborCodec extends ServiceMap.Service<CborCodec, {
           try: () => Cbor.encode(validated as CborObj).toBuffer(),
           catch: (error) => new CborCodecError({ cause: error })
         })
-      })
-
-      const decodeValid = Effect.fn("CborCodec.decodeValid")(function*<S extends Schema.Top>(
+      }),
+      decodeValid: Effect.fn("CborCodec.decodeValid")(function*<S extends Schema.Top>(
         bytes: Uint8Array,
         schema: S
       ) {
@@ -73,16 +69,7 @@ export class CborCodec extends ServiceMap.Service<CborCodec, {
         // Then validate against the schema
         return yield* Schema.decodeUnknownEffect(schema)(decoded)
       })
-
-      // Return an instance of the service using CborCodec.of, passing in an
-      // object that implements the service interface.
-      return CborCodec.of({
-        encode,
-        decode,
-        encodeValid,
-        decodeValid
-      })
-    })
+    })    
   )
 }
 

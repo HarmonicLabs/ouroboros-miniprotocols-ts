@@ -1,2 +1,2 @@
-export * from "./multiplexerMessage";
-export * from "./Multiplexer";
+export * from "./MultiplexerSchemas"
+export * from "./Multiplexer"
