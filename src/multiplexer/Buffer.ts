@@ -49,3 +49,5 @@ export class MultiplexerBuffer extends ServiceMap.Service<MultiplexerBuffer, {
     }),
   );
 }
+
+export const MultiplexerBufferLive = MultiplexerBuffer.layer;
