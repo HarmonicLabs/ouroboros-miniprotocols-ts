@@ -1,5 +1,5 @@
 import { Effect, Schema } from "effect";
-import { MultiplexerHeader } from "./_multiplexer"; 
+import { MultiplexerHeader } from "./multiplexer"; 
 
 /**
  * Schema for options when adding an event listener.
