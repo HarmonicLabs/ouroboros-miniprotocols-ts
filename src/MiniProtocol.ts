@@ -10,7 +10,7 @@ export enum MiniProtocol {
   LocalStateQuery = 7,
   KeepAlive = 8,
   LocalTxMonitor = 9,
-  PeerSharing = 10
+  PeerSharing = 10,
 }
 
 export const MiniProtocolSchema = Schema.Enum(MiniProtocol);

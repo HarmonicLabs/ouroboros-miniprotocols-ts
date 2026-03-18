@@ -2,66 +2,66 @@
   "compilerOptions": {
     "skipLibCheck": true,
     /* Basic Options */
-    "target": "ESNext",                      /* Modern ECMAScript target for Bun and Effect-TS */
-    "module": "ESNext",                      /* ESNext modules for better tree-shaking and bundling */
-    "lib": ["ESNext", "DOM"],                /* Include ESNext and DOM libs for Bun runtime */
-    "allowJs": true,                         /* Allow javascript files to be compiled */
-    "declaration": true,                     /* Generates corresponding '.d.ts' file */
-    "declarationMap": true,                  /* Generates a sourcemap for each '.d.ts' file */
-    "sourceMap": true,                       /* Generates corresponding '.map' file */
-    "outDir": "./dist",                      /* Redirect output structure to the directory */
-    "rootDir": "./src",                      /* Specify the root directory of input files */
-    "removeComments": false,                 /* Keep comments for documentation */
-    "importHelpers": false,                  /* Don't import helpers from 'tslib' */
-    "downlevelIteration": false,             /* Not needed for ES2022 target */
-    "isolatedModules": true,                 /* Transpile each file as a separate module */
+    "target": "ESNext", /* Modern ECMAScript target for Bun and Effect-TS */
+    "module": "ESNext", /* ESNext modules for better tree-shaking and bundling */
+    "lib": ["ESNext", "DOM"], /* Include ESNext and DOM libs for Bun runtime */
+    "allowJs": true, /* Allow javascript files to be compiled */
+    "declaration": true, /* Generates corresponding '.d.ts' file */
+    "declarationMap": true, /* Generates a sourcemap for each '.d.ts' file */
+    "sourceMap": true, /* Generates corresponding '.map' file */
+    "outDir": "./dist", /* Redirect output structure to the directory */
+    "rootDir": "./src", /* Specify the root directory of input files */
+    "removeComments": false, /* Keep comments for documentation */
+    "importHelpers": false, /* Don't import helpers from 'tslib' */
+    "downlevelIteration": false, /* Not needed for ES2022 target */
+    "isolatedModules": true, /* Transpile each file as a separate module */
 
     /* Strict Type-Checking Options */
-    "strict": true,                          /* Enable all strict type-checking options for Effect-TS */
-    "noImplicitAny": true,                   /* Raise error on expressions with implied 'any' type */
-    "strictNullChecks": true,                /* Enable strict null checks */
-    "strictFunctionTypes": true,             /* Enable strict checking of function types */
-    "strictBindCallApply": true,             /* Enable strict 'bind', 'call', and 'apply' methods */
-    "strictPropertyInitialization": true,    /* Enable strict checking of property initialization */
-    "noImplicitThis": true,                  /* Raise error on 'this' expressions with implied 'any' type */
-    "alwaysStrict": true,                    /* Parse in strict mode and emit "use strict" */
-    "exactOptionalPropertyTypes": true,      /* Distinguish optional and undefined properties */
+    "strict": true, /* Enable all strict type-checking options for Effect-TS */
+    "noImplicitAny": true, /* Raise error on expressions with implied 'any' type */
+    "strictNullChecks": true, /* Enable strict null checks */
+    "strictFunctionTypes": true, /* Enable strict checking of function types */
+    "strictBindCallApply": true, /* Enable strict 'bind', 'call', and 'apply' methods */
+    "strictPropertyInitialization": true, /* Enable strict checking of property initialization */
+    "noImplicitThis": true, /* Raise error on 'this' expressions with implied 'any' type */
+    "alwaysStrict": true, /* Parse in strict mode and emit "use strict" */
+    "exactOptionalPropertyTypes": true, /* Distinguish optional and undefined properties */
 
     /* Additional Checks */
-    "noUnusedLocals": false,                 /* Allow unused locals during development */
-    "noUnusedParameters": false,             /* Allow unused parameters during development */
-    "noImplicitReturns": true,               /* Report error when not all code paths return a value */
-    "noFallthroughCasesInSwitch": true,      /* Report errors for fallthrough cases in switch */
-    "noUncheckedIndexedAccess": true,        /* Enable stricter array/tuple access checks */
+    "noUnusedLocals": false, /* Allow unused locals during development */
+    "noUnusedParameters": false, /* Allow unused parameters during development */
+    "noImplicitReturns": true, /* Report error when not all code paths return a value */
+    "noFallthroughCasesInSwitch": true, /* Report errors for fallthrough cases in switch */
+    "noUncheckedIndexedAccess": true, /* Enable stricter array/tuple access checks */
 
     /* Module Resolution Options */
-    "moduleResolution": "bundler",           /* Use bundler resolution for modern bundlers like Bun */
-    "baseUrl": ".",                          /* Base directory for path resolution */
+    "moduleResolution": "bundler", /* Use bundler resolution for modern bundlers like Bun */
+    "baseUrl": ".", /* Base directory for path resolution */
     "paths": {
-      "@/*": ["src/*"],                      /* Path mapping for cleaner imports */
+      "@/*": ["src/*"], /* Path mapping for cleaner imports */
       "@/protocols/*": ["src/protocols/*"],
       "@/multiplexer/*": ["src/multiplexer/*"],
       "@/common/*": ["src/common/*"]
     },
-    "allowSyntheticDefaultImports": true,    /* Allow default imports from modules with no default export */
-    "esModuleInterop": true,                 /* Enables emit interoperability between CommonJS and ES Modules */
-    "resolveJsonModule": true,               /* Include modules imported with .json extension */
-    "allowImportingTsExtensions": false,     /* Don't allow importing .ts/.tsx extensions */
+    "allowSyntheticDefaultImports": true, /* Allow default imports from modules with no default export */
+    "esModuleInterop": true, /* Enables emit interoperability between CommonJS and ES Modules */
+    "resolveJsonModule": true, /* Include modules imported with .json extension */
+    "allowImportingTsExtensions": false, /* Don't allow importing .ts/.tsx extensions */
 
     /* Source Map Options */
-    "sourceRoot": ".",                       /* Specify the location where debugger should locate TypeScript files */
-    "inlineSources": false,                  /* Don't inline sources in sourcemaps */
+    "sourceRoot": ".", /* Specify the location where debugger should locate TypeScript files */
+    "inlineSources": false, /* Don't inline sources in sourcemaps */
 
     /* Experimental Options */
-    "experimentalDecorators": false,         /* Disable decorators for cleaner code */
-    "emitDecoratorMetadata": false,          /* Disable decorator metadata */
+    "experimentalDecorators": false, /* Disable decorators for cleaner code */
+    "emitDecoratorMetadata": false, /* Disable decorator metadata */
 
     /* Advanced Options */
     "forceConsistentCasingInFileNames": true, /* Disallow inconsistently-cased references to the same file */
-    "verbatimModuleSyntax": false,           /* Allow TypeScript to rewrite imports for compatibility */
+    "verbatimModuleSyntax": false, /* Allow TypeScript to rewrite imports for compatibility */
 
     /* Effect-TS specific options */
-    "useDefineForClassFields": true          /* Use define semantics for class fields */
+    "useDefineForClassFields": true /* Use define semantics for class fields */
   },
   "include": ["./src/**/*"],
   "exclude": [

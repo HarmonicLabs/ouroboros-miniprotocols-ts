@@ -43,6 +43,7 @@
           programs = {
             deno.enable = true;
             nixpkgs-fmt.enable = true;
+            rustfmt.enable = true;
           };
         };
 
