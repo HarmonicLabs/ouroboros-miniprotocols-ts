@@ -1,4 +1,4 @@
-import { MiniProtocolSchema } from "@/MiniProtocol";
+import { MiniProtocolSchema } from "../MiniProtocol";
 import { Schema } from "effect";
 
 export const MultiplexerHeaderSchema = Schema.Struct({
@@ -8,10 +8,9 @@ export const MultiplexerHeaderSchema = Schema.Struct({
   payloadLength: Schema.Int,
 });
 
-export const ProcessedFrameSchema = Schema.Struct({
-  header: MultiplexerHeaderSchema,
-  payload: Schema.Uint8Array,
-});
+export const ProcessedFrameSchema = MultiplexerHeaderSchema.pipe(
+  Schema.fieldsAssign({ payload: Schema.Uint8Array })
+);
 
 export const ProcessedFrameArraySchema = ProcessedFrameSchema.pipe(
   Schema.Array,
