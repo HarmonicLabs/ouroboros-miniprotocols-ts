@@ -1,4 +1,4 @@
-import { Config, Duration, Effect, Schema } from "effect";
+import { Effect, Schema } from "effect";
 import * as Socket from "effect/unstable/socket/Socket";
 
 import {
@@ -13,6 +13,9 @@ import {
 /**
  * Type definitions derived from schemas
  */
+export type MultiplexerProtocolType = Schema.Schema.Type<
+  typeof MultiplexerProtocolTypeSchema
+>;
 export type MultiplexerHeaderInfos = Schema.Schema.Type<
   typeof MultiplexerHeaderInfosSchema
 >;
@@ -21,9 +24,6 @@ export type MultiplexerHeader = Schema.Schema.Type<
 >;
 export type MultiplexerMessage = Schema.Schema.Type<
   typeof MultiplexerMessageSchema
->;
-export type MultiplexerProtocolType = Schema.Schema.Type<
-  typeof MultiplexerProtocolTypeSchema
 >;
 export type MultiplexerCloseOptions = Schema.Schema.Type<
   typeof MultiplexerCloseOptionsSchema
@@ -50,30 +50,10 @@ export interface MultiplexerEvtListeners {
   ) => Effect.Effect<void>)[];
 }
 
-export const MultiplexerConfig = Config.schema(
-  MultiplexerConfigSchema,
-  "MULTIPLEXER",
-).pipe(
-  Config.withDefault({
-    protocolType: "node-to-node" as const,
-    timeout: Duration.seconds(30),
-    bufferSize: 8192,
-    maxFrameSize: 32768,
-    reconnectAttempts: 3,
-  }),
-);
-
-/**
- * Type definitions derived from schemas
- */
-export type MultiplexerConfigFields = Schema.Schema.Type<
-  typeof MultiplexerConfigSchema
->;
-
 /**
  * Multiplexer configuration type (includes runtime fields)
  */
-export type MultiplexerConfig = MultiplexerConfigFields & {
+export type MultiplexerConfig = Schema.Schema.Type<typeof MultiplexerConfigSchema> & {
   connect: () => Socket.Socket;
   initialListeners?: Partial<MultiplexerEvtListeners>;
   initialOnceListeners?: Partial<MultiplexerEvtListeners>;

@@ -1,5 +1,6 @@
+import { Config, Duration, Schema } from "effect";
+
 import { MiniProtocolSchema } from "../MiniProtocol";
-import { Schema } from "effect";
 
 export const MultiplexerHeaderSchema = Schema.Struct({
   transmissionTime: Schema.Number,
@@ -34,24 +35,23 @@ export const MultiplexerMessageSchema = Schema.Struct({
   payload: Schema.Uint8Array,
 });
 
+export const MultiplexerProtocolTypeSchema = Schema.Enum({
+  NodeToNode: "node-to-node",
+  NodeToClient: "node-to-client",
+});
+
+
 /**
  * Schema for multiplexer configuration (serializable/configurable fields)
  */
 export const MultiplexerConfigSchema = Schema.Struct({
-  protocolType: Schema.Literals(["node-to-node", "node-to-client"]),
+  protocolType: MultiplexerProtocolTypeSchema,
   timeout: Schema.Duration,
   bufferSize: Schema.Int,
   maxFrameSize: Schema.Int,
   reconnectAttempts: Schema.Int,
 });
 
-/**
- * Schema for multiplexer protocol type
- */
-export const MultiplexerProtocolTypeSchema = Schema.Literals([
-  "node-to-node",
-  "node-to-client",
-]);
 
 /**
  * Schema for multiplexer close options
@@ -59,3 +59,19 @@ export const MultiplexerProtocolTypeSchema = Schema.Literals([
 export const MultiplexerCloseOptionsSchema = Schema.Struct({
   closeSocket: Schema.Boolean.pipe(Schema.optional),
 });
+
+/**
+ * Multiplexer configuration
+ */
+export const MultiplexerUserConfig = Config.schema(
+  MultiplexerConfigSchema,
+  "MULTIPLEXER",
+).pipe(
+  Config.withDefault({
+    protocolType: MultiplexerProtocolTypeSchema.enums.NodeToNode,
+    timeout: Duration.seconds(30),
+    bufferSize: 8192,
+    maxFrameSize: 32768,
+    reconnectAttempts: 3,
+  }),
+);

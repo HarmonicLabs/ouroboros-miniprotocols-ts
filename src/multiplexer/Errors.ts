@@ -1,4 +1,5 @@
 import { Schema } from "effect";
+import { ProcessedFrameSchema } from "./Schemas";
 
 /**
  * Multiplexer error types
@@ -6,7 +7,10 @@ import { Schema } from "effect";
 export class MultiplexerHeaderError
   extends Schema.ErrorClass<MultiplexerHeaderError>("MultiplexerHeaderError")({
     operation: Schema.String,
-    rawData: Schema.Uint8Array,
+    data: Schema.TaggedUnion({
+      Parsed: { frame: ProcessedFrameSchema },
+      Raw: { raw: Schema.Uint8Array },
+    }),
     cause: Schema.Defect,
   }) {}
 

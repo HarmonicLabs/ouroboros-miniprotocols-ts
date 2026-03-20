@@ -1,4 +1,5 @@
 import {
+  Data,
   Effect,
   Fiber,
   HashMap,
@@ -13,11 +14,12 @@ import {
 } from "effect";
 import * as Socket from "effect/unstable/socket/Socket";
 
-import * as _ from "lodash";
+import "lodash";
 
 import { MiniProtocol } from "../MiniProtocol";
 import { MultiplexerBuffer } from "./Buffer";
-import { MultiplexerError, MultiplexerFrameError } from "./Errors";
+import { MultiplexerError, MultiplexerFrameError, MultiplexerHeaderError } from "./Errors";
+import { CborCodec } from "@/services";
 
 /**
  * Protocol channel for streaming messages
@@ -80,15 +82,15 @@ export class Multiplexer extends ServiceMap.Service<Multiplexer, {
             Effect.forEach(
               (frame) =>
                 channels.pipe(
-                  HashMap.get(frame.header.protocol),
+                  HashMap.get(frame.protocol),
                   Option.match({
                     onNone: () =>
                       Effect.fail(
-                        new MultiplexerFrameError({
-                          frameType: "UNKNOWN",
-                          frameData: frame.payload,
+                        new MultiplexerHeaderError({
+                          operation: "Decode frames",
+                          data: { _tag: "Parsed", frame },
                           cause: new Error(
-                            `Invalid frame header: ${frame.header}`,
+                            `Invalid frame header`,
                           ),
                         }),
                       ),
