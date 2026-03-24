@@ -1,5 +1,4 @@
 import {
-  Data,
   Effect,
   Fiber,
   HashMap,
@@ -14,12 +13,11 @@ import {
 } from "effect";
 import * as Socket from "effect/unstable/socket/Socket";
 
-import "lodash";
+import { wrap_multiplexer_message } from "wasm-plexer";
 
 import { MiniProtocol } from "../MiniProtocol";
 import { MultiplexerBuffer } from "./Buffer";
-import { MultiplexerError, MultiplexerFrameError, MultiplexerHeaderError } from "./Errors";
-import { CborCodec } from "@/services";
+import { MultiplexerEncodingError, MultiplexerHeaderError } from "./Errors";
 
 /**
  * Protocol channel for streaming messages
@@ -29,7 +27,7 @@ export interface ProtocolChannel {
   readonly incoming: Stream.Stream<Uint8Array, never, Scope.Scope>;
   readonly send: (
     data: Uint8Array,
-  ) => Effect.Effect<void, Socket.SocketError, Scope.Scope>;
+  ) => Effect.Effect<void, MultiplexerEncodingError | Socket.SocketError, Scope.Scope>;
 }
 
 /**
@@ -41,7 +39,7 @@ export class Multiplexer extends ServiceMap.Service<Multiplexer, {
    */
   getProtocolChannel: (protocolId: MiniProtocol) => Effect.Effect<
     ProtocolChannel,
-    MultiplexerError | Socket.SocketError | Schema.SchemaError,
+    MultiplexerHeaderError | Socket.SocketError | Schema.SchemaError,
     Scope.Scope
   >;
 }>()("@harmoniclabs/ouroboros-miniprotocols-ts/Multiplexer") {
@@ -58,10 +56,7 @@ export class Multiplexer extends ServiceMap.Service<Multiplexer, {
           [MiniProtocol.LocalChainSync, yield* PubSub.unbounded<Uint8Array>()],
           [MiniProtocol.LocalStateQuery, yield* PubSub.unbounded<Uint8Array>()],
           [MiniProtocol.LocalTxMonitor, yield* PubSub.unbounded<Uint8Array>()],
-          [
-            MiniProtocol.LocalTxSubmission,
-            yield* PubSub.unbounded<Uint8Array>(),
-          ],
+          [MiniProtocol.LocalTxSubmission, yield* PubSub.unbounded<Uint8Array>()],
           [MiniProtocol.PeerSharing, yield* PubSub.unbounded<Uint8Array>()],
           [MiniProtocol.TxSubmission, yield* PubSub.unbounded<Uint8Array>()],
         ]);
@@ -89,15 +84,11 @@ export class Multiplexer extends ServiceMap.Service<Multiplexer, {
                         new MultiplexerHeaderError({
                           operation: "Decode frames",
                           data: { _tag: "Parsed", frame },
-                          cause: new Error(
-                            `Invalid frame header`,
-                          ),
+                          cause: new Error(`Invalid frame header`),
                         }),
                       ),
                     onSome: (ps) =>
-                      ps.pipe(
-                        PubSub.publish(frame.payload),
-                      ),
+                      ps.pipe(PubSub.publish(frame.payload)),
                   }),
                 ),
             ),
@@ -114,15 +105,14 @@ export class Multiplexer extends ServiceMap.Service<Multiplexer, {
         };
       }),
       ({ fetchFiber, processFiber }) =>
-        Effect.gen(function* () {
-          yield* Fiber.interrupt(fetchFiber);
-          yield* Fiber.interrupt(processFiber);
-        }),
+        Fiber.interrupt(fetchFiber).pipe(
+          Effect.andThen(Fiber.interrupt(processFiber)),
+        ),
     ).pipe(
       Effect.map(({ socket, channels }) => ({
         getProtocolChannel: Effect.fn("Multiplexer.getProtocolChannel")(
-          function* (protocolId: MiniProtocol) {
-            return yield* channels.pipe(
+          (protocolId: MiniProtocol) =>
+            channels.pipe(
               HashMap.get(protocolId),
               Option.match({
                 onNone: () =>
@@ -137,14 +127,26 @@ export class Multiplexer extends ServiceMap.Service<Multiplexer, {
                     incoming: Stream.fromPubSub(ps),
                     send: Effect.fn(`${protocolId}.send`)(
                       (data: Uint8Array) =>
-                        socket.writer.pipe(
-                          Effect.flatMap((write) => write(data)),
+                        Effect.try({
+                          try: () => wrap_multiplexer_message(data, protocolId, true),
+                          catch: (e) =>
+                            new MultiplexerEncodingError({
+                              operation: "Frame wrapping",
+                              payload: data,
+                              protocol: protocolId,
+                              cause: e,
+                            }),
+                        }).pipe(
+                          Effect.flatMap((framedData) =>
+                            socket.writer.pipe(
+                              Effect.flatMap((write) => write(framedData)),
+                            )
+                          ),
                         ),
                     ),
                   }),
               }),
-            );
-          },
+            ),
         ),
       })),
     ),

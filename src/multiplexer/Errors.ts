@@ -5,7 +5,7 @@ import { ProcessedFrameSchema } from "./Schemas";
  * Multiplexer error types
  */
 export class MultiplexerHeaderError
-  extends Schema.ErrorClass<MultiplexerHeaderError>("MultiplexerHeaderError")({
+  extends Schema.TaggedErrorClass<MultiplexerHeaderError>()("MultiplexerHeaderError", {
     operation: Schema.String,
     data: Schema.TaggedUnion({
       Parsed: { frame: ProcessedFrameSchema },
@@ -15,9 +15,7 @@ export class MultiplexerHeaderError
   }) {}
 
 export class MultiplexerEncodingError
-  extends Schema.ErrorClass<MultiplexerEncodingError>(
-    "MultiplexerEncodingError",
-  )({
+  extends Schema.TaggedErrorClass<MultiplexerEncodingError>()("MultiplexerEncodingError", {
     operation: Schema.String,
     payload: Schema.Uint8Array,
     protocol: Schema.Number,
@@ -32,32 +30,28 @@ export type MultiplexerAuxError =
  * Multiplexer error types
  */
 export class MultiplexerConnectionError
-  extends Schema.ErrorClass<MultiplexerConnectionError>(
-    "MultiplexerConnectionError",
-  )({
+  extends Schema.TaggedErrorClass<MultiplexerConnectionError>()("MultiplexerConnectionError", {
     protocolType: Schema.String,
     attempt: Schema.Number,
     cause: Schema.Defect,
   }) {}
 
 export class MultiplexerProtocolError
-  extends Schema.ErrorClass<MultiplexerProtocolError>(
-    "MultiplexerProtocolError",
-  )({
+  extends Schema.TaggedErrorClass<MultiplexerProtocolError>()("MultiplexerProtocolError", {
     protocolId: Schema.Number,
     operation: Schema.String,
     cause: Schema.Defect,
   }) {}
 
 export class MultiplexerFrameError
-  extends Schema.ErrorClass<MultiplexerFrameError>("MultiplexerFrameError")({
+  extends Schema.TaggedErrorClass<MultiplexerFrameError>()("MultiplexerFrameError", {
     frameType: Schema.String,
     frameData: Schema.Uint8Array,
     cause: Schema.Defect,
   }) {}
 
 export class MultiplexerBufferError
-  extends Schema.ErrorClass<MultiplexerBufferError>("MultiplexerBufferError")({
+  extends Schema.TaggedErrorClass<MultiplexerBufferError>()("MultiplexerBufferError", {
     cause: Schema.Defect,
   }) {}
 

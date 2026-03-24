@@ -42,7 +42,7 @@ export class MultiplexerBuffer extends ServiceMap.Service<MultiplexerBuffer, {
           () =>
             Effect.try({
               try: () => wasmBuffer.buffer_len(),
-              catch: (e) => new MultiplexerBufferError({ cause: e as Error }),
+              catch: (cause) => new MultiplexerBufferError({ cause, }),
             }),
         ),
       };

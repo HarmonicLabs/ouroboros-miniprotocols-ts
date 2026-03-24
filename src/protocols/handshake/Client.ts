@@ -1,5 +1,6 @@
 import {
   Cause,
+  Duration,
   Effect,
   Layer,
   Option,
@@ -9,35 +10,21 @@ import {
   Stream,
 } from "effect";
 
-import { Socket } from "effect/unstable/socket"; 
+import { Socket } from "effect/unstable/socket";
 
 import { Multiplexer } from "../../multiplexer/Multiplexer";
-import { CborCodec, CborCodecError } from "../../services/CborCodec";
+import { MultiplexerEncodingError } from "../../multiplexer/Errors";
 import { MiniProtocol } from "../../MiniProtocol";
 import * as Schemas from "./Schemas";
 
 /**
- * Type aliases derived from Effect-TS schemas
- */
-export type NodeToNodeVersionData = Schema.Schema.Type<typeof Schemas.NodeToNodeVersionDataSchema>;
-export type NodeToClientVersionData = Schema.Schema.Type<typeof Schemas.NodeToClientVersionDataSchema>;
-export type VersionTable = Schema.Schema.Type<typeof Schemas.VersionTableSchema>;
-export type RefuseReason = Schema.Schema.Type<typeof Schemas.RefuseReasonSchema>;
-export type HandshakeMessage = Schema.Schema.Type<typeof Schemas.HandshakeMessage>;
-
-/**
- * Handshake result types
- */
-export type HandshakeResult = Schema.Schema.Type<typeof Schemas.HandshakeMessage>;
-
-/**
  * Handshake errors
  */
-export class HandshakeError extends Schema.ErrorClass<HandshakeError>("HandshakeError")({
+export class HandshakeError extends Schema.TaggedErrorClass<HandshakeError>()("HandshakeError", {
   cause: Schema.Defect,
 }) {}
 
-export class HandshakeTimeoutError extends Schema.ErrorClass<HandshakeTimeoutError>("HandshakeTimeoutError")({
+export class HandshakeTimeoutError extends Schema.TaggedErrorClass<HandshakeTimeoutError>()("HandshakeTimeoutError", {
   cause: Schema.Defect,
 }) {}
 
@@ -45,71 +32,49 @@ export class HandshakeTimeoutError extends Schema.ErrorClass<HandshakeTimeoutErr
  * Effect-TS Handshake client service
  */
 export class HandshakeClient extends ServiceMap.Service<HandshakeClient, {
-  /**
-   * Propose handshake versions and wait for server response
-   */
   propose: (
-    versionTable: VersionTable,
+    versionTable: Schemas.VersionTable,
   ) => Effect.Effect<
-    HandshakeResult,
-    HandshakeError | HandshakeTimeoutError | Socket.SocketError | Schema.SchemaError | CborCodecError | Cause.TimeoutError,
-    Scope.Scope | Socket.Socket
+    Schemas.HandshakeMessageT,
+    HandshakeError | HandshakeTimeoutError | MultiplexerEncodingError | Socket.SocketError | Schema.SchemaError | Cause.TimeoutError,
+    Scope.Scope
   >;
 }>()("@harmoniclabs/ouroboros-miniprotocols-ts/HandshakeClient") {
   static readonly layer = Layer.effect(
     HandshakeClient,
     Effect.gen(function* () {
       const multiplexer = yield* Multiplexer;
-      const cborCodec = yield* CborCodec;
 
       return HandshakeClient.of({
         propose: Effect.fn("HandshakeClient.propose")(
-          function* (
-            versionTable: VersionTable,
-          ) {
-            // Get the handshake protocol channel
+          function* (versionTable: Schemas.VersionTable) {
             const channel = yield* multiplexer.getProtocolChannel(MiniProtocol.Handshake).pipe(
               Effect.mapError((cause) => new HandshakeError({ cause })),
             );
 
-            // Create the propose message
             const proposeMessage = {
               _tag: Schemas.HandshakeMessageType.MsgProposeVersions,
               versionTable,
             };
 
-            // Encode to bytes using the FromCbor schema for encoding
-            const bytes = yield* cborCodec.encodeValid(proposeMessage, Schemas.HandshakeMessageFromCbor);
+            const bytes = yield* Schema.encodeUnknownEffect(Schemas.HandshakeMessageBytes)(proposeMessage);
 
-            // Send the message
-            yield* channel.send(bytes)
+            yield* channel.send(bytes);
 
-            // .pipe(
-            //   Effect.mapError((cause) => new HandshakeError({ cause })),
-            // );
-
-            // Wait for response
-            const responseBytesToResult = channel.incoming.pipe(
+            return yield* channel.incoming.pipe(
               Stream.take(1),
+              Stream.mapEffect((bytes) =>
+                Schema.decodeUnknownEffect(Schemas.HandshakeMessageBytes)(bytes)
+              ),
               Stream.runHead,
               Effect.flatMap(
                 Option.match({
-                  onNone: () =>
-                    Effect.fail(new HandshakeError({ cause: "No response received" })),
-                  onSome: (responseBytes) =>
-                    cborCodec
-                      .decodeValid(responseBytes, Schemas.HandshakeMessageFromCbor)
-                }),
+                  onNone: () => Effect.fail(new HandshakeError({ cause: "No response received" })),
+                  onSome: Effect.succeed,
+                })
               ),
+              Effect.timeout(Duration.seconds(10)),
             );
-
-            // Apply timeout
-            const timed = responseBytesToResult.pipe(
-              Effect.timeout("10 seconds"),
-            );
-
-            // Map unexpected errors to HandshakeError
-            return yield* timed;
           },
         ),
       });

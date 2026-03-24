@@ -96,6 +96,6 @@ export class CborCodec extends ServiceMap.Service<CborCodec, {
  * CBOR codec errors
  */
 export class CborCodecError
-  extends Schema.ErrorClass<CborCodecError>("CborCodecError")({
+  extends Schema.TaggedErrorClass<CborCodecError>()("CborCodecError", {
     cause: Schema.Defect,
   }) {}
