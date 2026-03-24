@@ -3,7 +3,7 @@ import {
     Duration,
     Effect,
     Layer,
-    Option,
+    Queue,
     Schema,
     Scope,
     ServiceMap,
@@ -57,26 +57,17 @@ export class PeerSharingClient extends ServiceMap.Service<PeerSharingClient, {
                 Effect.mapError((cause) => new PeerSharingError({ cause })),
             );
 
-            const incoming = channel.incoming.pipe(
+            const inbox = yield* Queue.unbounded<Schemas.PeerSharingMessageT>();
+            yield* channel.incoming.pipe(
                 Stream.mapEffect((bytes) => decodeMessage(bytes)),
+                Stream.runForEach((msg) => Queue.offer(inbox, msg)),
+                Effect.forkChild,
             );
 
             const sendMessage = (msg: Schemas.PeerSharingMessageT) =>
                 encodeMessage(msg).pipe(Effect.flatMap(channel.send));
 
-            const receiveOne = incoming.pipe(
-                Stream.take(1),
-                Stream.runHead,
-                Effect.flatMap(
-                    Option.match({
-                        onNone: () =>
-                            Effect.fail(
-                                new PeerSharingError({ cause: "No response" }),
-                            ),
-                        onSome: Effect.succeed,
-                    }),
-                ),
-            );
+            const receiveOne = Queue.take(inbox);
 
             return PeerSharingClient.of({
                 shareRequest: Effect.fn("PeerSharingClient.shareRequest")(

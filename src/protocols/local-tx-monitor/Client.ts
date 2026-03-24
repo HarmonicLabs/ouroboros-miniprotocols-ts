@@ -4,6 +4,7 @@ import {
     Effect,
     Layer,
     Option,
+    Queue,
     Ref,
     Schema,
     Scope,
@@ -100,28 +101,17 @@ export class LocalTxMonitorClient
             );
             const state = yield* Ref.make<MonitorState>("Idle");
 
-            const incoming = channel.incoming.pipe(
+            const inbox = yield* Queue.unbounded<Schemas.LocalTxMonitorMessageT>();
+            yield* channel.incoming.pipe(
                 Stream.mapEffect((bytes) => decodeMessage(bytes)),
+                Stream.runForEach((msg) => Queue.offer(inbox, msg)),
+                Effect.forkChild,
             );
 
             const sendMessage = (msg: Schemas.LocalTxMonitorMessageT) =>
                 encodeMessage(msg).pipe(Effect.flatMap(channel.send));
 
-            const receiveOne = incoming.pipe(
-                Stream.take(1),
-                Stream.runHead,
-                Effect.flatMap(
-                    Option.match({
-                        onNone: () =>
-                            Effect.fail(
-                                new LocalTxMonitorError({
-                                    cause: "No response",
-                                }),
-                            ),
-                        onSome: Effect.succeed,
-                    }),
-                ),
-            );
+            const receiveOne = Queue.take(inbox);
 
             const guardState = (expected: MonitorState) =>
                 Ref.get(state).pipe(

@@ -3,7 +3,7 @@ import {
     Duration,
     Effect,
     Layer,
-    Option,
+    Queue,
     Ref,
     Schema,
     Scope,
@@ -99,28 +99,17 @@ export class LocalStateQueryClient
             );
             const state = yield* Ref.make<QueryState>("Idle");
 
-            const incoming = channel.incoming.pipe(
+            const inbox = yield* Queue.unbounded<Schemas.LocalStateQueryMessageT>();
+            yield* channel.incoming.pipe(
                 Stream.mapEffect((bytes) => decodeMessage(bytes)),
+                Stream.runForEach((msg) => Queue.offer(inbox, msg)),
+                Effect.forkChild,
             );
 
             const sendMessage = (msg: Schemas.LocalStateQueryMessageT) =>
                 encodeMessage(msg).pipe(Effect.flatMap(channel.send));
 
-            const receiveOne = incoming.pipe(
-                Stream.take(1),
-                Stream.runHead,
-                Effect.flatMap(
-                    Option.match({
-                        onNone: () =>
-                            Effect.fail(
-                                new LocalStateQueryError({
-                                    cause: "No response",
-                                }),
-                            ),
-                        onSome: Effect.succeed,
-                    }),
-                ),
-            );
+            const receiveOne = Queue.take(inbox);
 
             const guardState = (expected: QueryState) =>
                 Ref.get(state).pipe(

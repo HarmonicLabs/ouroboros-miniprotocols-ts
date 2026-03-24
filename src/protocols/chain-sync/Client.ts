@@ -1,10 +1,9 @@
 import {
     Cause,
-    Deferred,
     Duration,
     Effect,
     Layer,
-    Option,
+    Queue,
     Schema,
     Scope,
     ServiceMap,
@@ -25,24 +24,16 @@ export class ChainSyncError
 
 export type ChainSyncRollForward =
     & Schema.Schema.Type<typeof Schemas.ChainSyncMessage>
-    & {
-        readonly _tag: Schemas.ChainSyncMessageType.RollForward;
-    };
+    & { readonly _tag: Schemas.ChainSyncMessageType.RollForward };
 export type ChainSyncRollBackward =
     & Schema.Schema.Type<typeof Schemas.ChainSyncMessage>
-    & {
-        readonly _tag: Schemas.ChainSyncMessageType.RollBackward;
-    };
+    & { readonly _tag: Schemas.ChainSyncMessageType.RollBackward };
 export type ChainSyncIntersectFound =
     & Schema.Schema.Type<typeof Schemas.ChainSyncMessage>
-    & {
-        readonly _tag: Schemas.ChainSyncMessageType.IntersectFound;
-    };
+    & { readonly _tag: Schemas.ChainSyncMessageType.IntersectFound };
 export type ChainSyncIntersectNotFound =
     & Schema.Schema.Type<typeof Schemas.ChainSyncMessage>
-    & {
-        readonly _tag: Schemas.ChainSyncMessageType.IntersectNotFound;
-    };
+    & { readonly _tag: Schemas.ChainSyncMessageType.IntersectNotFound };
 
 const decodeMessage = Schema.decodeUnknownEffect(Schemas.ChainSyncMessageBytes);
 const encodeMessage = Schema.encodeUnknownEffect(Schemas.ChainSyncMessageBytes);
@@ -85,56 +76,51 @@ export class ChainSyncClient extends ServiceMap.Service<ChainSyncClient, {
                 Effect.mapError((cause) => new ChainSyncError({ cause })),
             );
 
-            const incoming = channel.incoming.pipe(
+            const inbox = yield* Queue.unbounded<Schemas.ChainSyncMessageT>();
+            yield* channel.incoming.pipe(
                 Stream.mapEffect((bytes) => decodeMessage(bytes)),
+                Stream.runForEach((msg) => Queue.offer(inbox, msg)),
+                Effect.forkChild,
             );
 
             const sendMessage = (msg: Schemas.ChainSyncMessageT) =>
                 encodeMessage(msg).pipe(Effect.flatMap(channel.send));
 
+            const receiveOne = Queue.take(inbox);
+
+            // Skip AwaitReply messages and return the next substantive response
+            const receiveNonAwait = Effect.gen(function* () {
+                let msg = yield* receiveOne;
+                while (msg._tag === Schemas.ChainSyncMessageType.AwaitReply) {
+                    msg = yield* receiveOne;
+                }
+                return msg;
+            });
+
             return ChainSyncClient.of({
                 requestNext: Effect.fn("ChainSyncClient.requestNext")(
                     function* () {
-                        const response = yield* Deferred.make<
-                            ChainSyncRollForward | ChainSyncRollBackward,
-                            ChainSyncError | Schema.SchemaError
-                        >();
-
-                        // Fork a fiber to listen for the non-AwaitReply response
-                        yield* incoming.pipe(
-                            Stream.filter((msg) =>
-                                msg._tag !==
-                                    Schemas.ChainSyncMessageType.AwaitReply
-                            ),
-                            Stream.take(1),
-                            Stream.runForEach((msg) => {
-                                if (
-                                    msg._tag ===
-                                        Schemas.ChainSyncMessageType
-                                            .RollForward ||
-                                    msg._tag ===
-                                        Schemas.ChainSyncMessageType
-                                            .RollBackward
-                                ) {
-                                    return Deferred.succeed(response, msg);
-                                }
-                                return Deferred.fail(
-                                    response,
-                                    new ChainSyncError({
-                                        cause:
-                                            `Unexpected message: ${msg._tag}`,
-                                    }),
-                                );
-                            }),
-                            Effect.forkChild,
-                        );
-
                         yield* sendMessage({
                             _tag: Schemas.ChainSyncMessageType.RequestNext,
                         });
 
-                        return yield* Deferred.await(response).pipe(
+                        const msg = yield* receiveNonAwait.pipe(
                             Effect.timeout(Duration.seconds(10)),
+                        );
+
+                        if (
+                            msg._tag ===
+                                Schemas.ChainSyncMessageType.RollForward ||
+                            msg._tag ===
+                                Schemas.ChainSyncMessageType.RollBackward
+                        ) {
+                            return msg;
+                        }
+
+                        return yield* Effect.fail(
+                            new ChainSyncError({
+                                cause: `Unexpected message: ${msg._tag}`,
+                            }),
                         );
                     },
                 ),
@@ -145,39 +131,23 @@ export class ChainSyncClient extends ServiceMap.Service<ChainSyncClient, {
                             points: [...points],
                         });
 
-                        return yield* incoming.pipe(
-                            Stream.take(1),
-                            Stream.mapEffect((msg) => {
-                                if (
-                                    msg._tag ===
-                                        Schemas.ChainSyncMessageType
-                                            .IntersectFound ||
-                                    msg._tag ===
-                                        Schemas.ChainSyncMessageType
-                                            .IntersectNotFound
-                                ) {
-                                    return Effect.succeed(msg);
-                                }
-                                return Effect.fail(
-                                    new ChainSyncError({
-                                        cause:
-                                            `Unexpected message: ${msg._tag}`,
-                                    }),
-                                );
-                            }),
-                            Stream.runHead,
-                            Effect.flatMap(
-                                Option.match({
-                                    onNone: () =>
-                                        Effect.fail(
-                                            new ChainSyncError({
-                                                cause: "No response",
-                                            }),
-                                        ),
-                                    onSome: Effect.succeed,
-                                }),
-                            ),
+                        const msg = yield* receiveOne.pipe(
                             Effect.timeout(Duration.seconds(10)),
+                        );
+
+                        if (
+                            msg._tag ===
+                                Schemas.ChainSyncMessageType.IntersectFound ||
+                            msg._tag ===
+                                Schemas.ChainSyncMessageType.IntersectNotFound
+                        ) {
+                            return msg;
+                        }
+
+                        return yield* Effect.fail(
+                            new ChainSyncError({
+                                cause: `Unexpected message: ${msg._tag}`,
+                            }),
                         );
                     },
                 ),

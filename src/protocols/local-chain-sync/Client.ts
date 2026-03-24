@@ -1,10 +1,9 @@
 import {
     Cause,
-    Deferred,
     Duration,
     Effect,
     Layer,
-    Option,
+    Queue,
     Schema,
     Scope,
     ServiceMap,
@@ -93,56 +92,53 @@ export class LocalChainSyncClient
                 Effect.mapError((cause) => new LocalChainSyncError({ cause })),
             );
 
-            const incoming = channel.incoming.pipe(
+            const inbox = yield* Queue.unbounded<Schemas.LocalChainSyncMessageT>();
+            yield* channel.incoming.pipe(
                 Stream.mapEffect((bytes) => decodeMessage(bytes)),
+                Stream.runForEach((msg) => Queue.offer(inbox, msg)),
+                Effect.forkChild,
             );
 
             const sendMessage = (msg: Schemas.LocalChainSyncMessageT) =>
                 encodeMessage(msg).pipe(Effect.flatMap(channel.send));
 
+            const receiveOne = Queue.take(inbox);
+
+            // Skip AwaitReply messages and return the next substantive response
+            const receiveNonAwait = Effect.gen(function* () {
+                let msg = yield* receiveOne;
+                while (msg._tag === Schemas.LocalChainSyncMessageType.AwaitReply) {
+                    msg = yield* receiveOne;
+                }
+                return msg;
+            });
+
             return LocalChainSyncClient.of({
                 requestNext: Effect.fn("LocalChainSyncClient.requestNext")(
                     function* () {
-                        const response = yield* Deferred.make<
-                            | LocalChainSyncRollForward
-                            | LocalChainSyncRollBackward,
-                            LocalChainSyncError | Schema.SchemaError
-                        >();
-
-                        yield* incoming.pipe(
-                            Stream.filter((msg) =>
-                                msg._tag !==
-                                    Schemas.LocalChainSyncMessageType.AwaitReply
-                            ),
-                            Stream.take(1),
-                            Stream.runForEach((msg) => {
-                                if (
-                                    msg._tag ===
-                                        Schemas.LocalChainSyncMessageType
-                                            .RollForward ||
-                                    msg._tag ===
-                                        Schemas.LocalChainSyncMessageType
-                                            .RollBackward
-                                ) {
-                                    return Deferred.succeed(response, msg);
-                                }
-                                return Deferred.fail(
-                                    response,
-                                    new LocalChainSyncError({
-                                        cause:
-                                            `Unexpected message: ${msg._tag}`,
-                                    }),
-                                );
-                            }),
-                            Effect.forkChild,
-                        );
-
                         yield* sendMessage({
                             _tag: Schemas.LocalChainSyncMessageType.RequestNext,
                         });
 
-                        return yield* Deferred.await(response).pipe(
+                        const msg = yield* receiveNonAwait.pipe(
                             Effect.timeout(Duration.seconds(10)),
+                        );
+
+                        if (
+                            msg._tag ===
+                                Schemas.LocalChainSyncMessageType
+                                    .RollForward ||
+                            msg._tag ===
+                                Schemas.LocalChainSyncMessageType
+                                    .RollBackward
+                        ) {
+                            return msg;
+                        }
+
+                        return yield* Effect.fail(
+                            new LocalChainSyncError({
+                                cause: `Unexpected message: ${msg._tag}`,
+                            }),
                         );
                     },
                 ),
@@ -154,39 +150,25 @@ export class LocalChainSyncClient
                             points: [...points],
                         });
 
-                        return yield* incoming.pipe(
-                            Stream.take(1),
-                            Stream.mapEffect((msg) => {
-                                if (
-                                    msg._tag ===
-                                        Schemas.LocalChainSyncMessageType
-                                            .IntersectFound ||
-                                    msg._tag ===
-                                        Schemas.LocalChainSyncMessageType
-                                            .IntersectNotFound
-                                ) {
-                                    return Effect.succeed(msg);
-                                }
-                                return Effect.fail(
-                                    new LocalChainSyncError({
-                                        cause:
-                                            `Unexpected message: ${msg._tag}`,
-                                    }),
-                                );
-                            }),
-                            Stream.runHead,
-                            Effect.flatMap(
-                                Option.match({
-                                    onNone: () =>
-                                        Effect.fail(
-                                            new LocalChainSyncError({
-                                                cause: "No response",
-                                            }),
-                                        ),
-                                    onSome: Effect.succeed,
-                                }),
-                            ),
+                        const msg = yield* receiveOne.pipe(
                             Effect.timeout(Duration.seconds(10)),
+                        );
+
+                        if (
+                            msg._tag ===
+                                Schemas.LocalChainSyncMessageType
+                                    .IntersectFound ||
+                            msg._tag ===
+                                Schemas.LocalChainSyncMessageType
+                                    .IntersectNotFound
+                        ) {
+                            return msg;
+                        }
+
+                        return yield* Effect.fail(
+                            new LocalChainSyncError({
+                                cause: `Unexpected message: ${msg._tag}`,
+                            }),
                         );
                     },
                 ),

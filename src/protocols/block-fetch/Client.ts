@@ -4,6 +4,7 @@ import {
     Effect,
     Layer,
     Option,
+    Queue,
     Schema,
     Scope,
     ServiceMap,
@@ -64,12 +65,17 @@ export class BlockFetchClient extends ServiceMap.Service<BlockFetchClient, {
                 Effect.mapError((cause) => new BlockFetchError({ cause })),
             );
 
-            const incoming = channel.incoming.pipe(
+            const inbox = yield* Queue.unbounded<Schemas.BlockFetchMessageT>();
+            yield* channel.incoming.pipe(
                 Stream.mapEffect((bytes) => decodeMessage(bytes)),
+                Stream.runForEach((msg) => Queue.offer(inbox, msg)),
+                Effect.forkChild,
             );
 
             const sendMessage = (msg: Schemas.BlockFetchMessageT) =>
                 encodeMessage(msg).pipe(Effect.flatMap(channel.send));
+
+            const receiveOne = Queue.take(inbox);
 
             return BlockFetchClient.of({
                 requestRange: Effect.fn("BlockFetchClient.requestRange")(
@@ -81,20 +87,7 @@ export class BlockFetchClient extends ServiceMap.Service<BlockFetchClient, {
                         });
 
                         // Wait for StartBatch or NoBlocks
-                        const firstMsg = yield* incoming.pipe(
-                            Stream.take(1),
-                            Stream.runHead,
-                            Effect.flatMap(
-                                Option.match({
-                                    onNone: () =>
-                                        Effect.fail(
-                                            new BlockFetchError({
-                                                cause: "No response",
-                                            }),
-                                        ),
-                                    onSome: Effect.succeed,
-                                }),
-                            ),
+                        const firstMsg = yield* receiveOne.pipe(
                             Effect.timeout(Duration.seconds(60)),
                         );
 
@@ -117,25 +110,17 @@ export class BlockFetchClient extends ServiceMap.Service<BlockFetchClient, {
                             );
                         }
 
-                        // Return a stream of blocks until BatchDone
-                        const blockStream = incoming.pipe(
-                            Stream.takeWhile((msg) =>
-                                msg._tag !==
-                                    Schemas.BlockFetchMessageType.BatchDone
-                            ),
-                            Stream.mapEffect((msg) =>
-                                msg._tag === Schemas.BlockFetchMessageType.Block
-                                    ? Effect.succeed(msg.block)
-                                    : Effect.fail(
-                                        new BlockFetchError({
-                                            cause:
-                                                `Unexpected message in batch: ${msg._tag}`,
-                                        }),
-                                    )
-                            ),
-                        );
+                        // Collect blocks from queue until BatchDone
+                        const blocks: Uint8Array[] = [];
+                        let msg = yield* receiveOne;
+                        while (msg._tag !== Schemas.BlockFetchMessageType.BatchDone) {
+                            if (msg._tag === Schemas.BlockFetchMessageType.Block) {
+                                blocks.push(msg.block);
+                            }
+                            msg = yield* receiveOne;
+                        }
 
-                        return Option.some(blockStream);
+                        return Option.some(Stream.fromIterable(blocks));
                     },
                 ),
                 done: Effect.fn("BlockFetchClient.done")(

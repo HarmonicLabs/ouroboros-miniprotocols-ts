@@ -7,6 +7,10 @@ export default defineConfig({
         globals: true,
         setupFiles: ["./vitest.setup.ts"],
         exclude: ["./old/**", "./.direnv/**", "./.devenv/**"],
+        benchmark: {
+            include: ["src/__tests__/benchmarks/**/*.bench.ts"],
+            reporters: ["default"],
+        },
     },
     resolve: {
         alias: {

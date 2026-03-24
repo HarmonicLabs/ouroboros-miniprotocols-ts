@@ -1,4 +1,4 @@
-import { Effect, Layer, Schema, Scope, ServiceMap, Stream } from "effect";
+import { Effect, Layer, Queue, Schema, Scope, ServiceMap, Stream } from "effect";
 import { Socket } from "effect/unstable/socket";
 
 import { Multiplexer } from "../../multiplexer/Multiplexer";
@@ -59,8 +59,11 @@ export class TxSubmissionClient extends ServiceMap.Service<TxSubmissionClient, {
                 Effect.mapError((cause) => new TxSubmissionError({ cause })),
             );
 
-            const incoming = channel.incoming.pipe(
+            const inbox = yield* Queue.unbounded<Schemas.TxSubmissionMessageT>();
+            yield* channel.incoming.pipe(
                 Stream.mapEffect((bytes) => decodeMessage(bytes)),
+                Stream.runForEach((msg) => Queue.offer(inbox, msg)),
+                Effect.forkChild,
             );
 
             const sendMessage = (msg: Schemas.TxSubmissionMessageT) =>
@@ -75,55 +78,53 @@ export class TxSubmissionClient extends ServiceMap.Service<TxSubmissionClient, {
                         });
 
                         // Enter the server-driven event loop
-                        yield* incoming.pipe(
-                            Stream.runForEach((msg) =>
-                                Effect.gen(function* () {
-                                    if (
-                                        msg._tag ===
-                                            Schemas.TxSubmissionMessageType
-                                                .RequestTxIds
-                                    ) {
-                                        const ids = yield* handlers
-                                            .onRequestTxIds(
-                                                msg.ack,
-                                                msg.req,
-                                                msg.blocking,
-                                            );
-                                        yield* sendMessage({
-                                            _tag:
-                                                Schemas.TxSubmissionMessageType
-                                                    .ReplyTxIds,
-                                            ids: [...ids],
-                                        });
-                                    } else if (
-                                        msg._tag ===
-                                            Schemas.TxSubmissionMessageType
-                                                .RequestTxs
-                                    ) {
-                                        const txs = yield* handlers
-                                            .onRequestTxs(msg.txIds);
-                                        yield* sendMessage({
-                                            _tag:
-                                                Schemas.TxSubmissionMessageType
-                                                    .ReplyTxs,
-                                            txs: [...txs],
-                                        });
-                                    } else if (
-                                        msg._tag ===
-                                            Schemas.TxSubmissionMessageType.Done
-                                    ) {
-                                        // Protocol done
-                                    } else {
-                                        yield* Effect.fail(
-                                            new TxSubmissionError({
-                                                cause:
-                                                    `Unexpected server message: ${msg._tag}`,
-                                            }),
-                                        );
-                                    }
-                                })
-                            ),
-                        );
+                        yield* Effect.gen(function* () {
+                            const msg = yield* Queue.take(inbox);
+
+                            if (
+                                msg._tag ===
+                                    Schemas.TxSubmissionMessageType
+                                        .RequestTxIds
+                            ) {
+                                const ids = yield* handlers
+                                    .onRequestTxIds(
+                                        msg.ack,
+                                        msg.req,
+                                        msg.blocking,
+                                    );
+                                yield* sendMessage({
+                                    _tag:
+                                        Schemas.TxSubmissionMessageType
+                                            .ReplyTxIds,
+                                    ids: [...ids],
+                                });
+                            } else if (
+                                msg._tag ===
+                                    Schemas.TxSubmissionMessageType
+                                        .RequestTxs
+                            ) {
+                                const txs = yield* handlers
+                                    .onRequestTxs(msg.txIds);
+                                yield* sendMessage({
+                                    _tag:
+                                        Schemas.TxSubmissionMessageType
+                                            .ReplyTxs,
+                                    txs: [...txs],
+                                });
+                            } else if (
+                                msg._tag ===
+                                    Schemas.TxSubmissionMessageType.Done
+                            ) {
+                                // Protocol done
+                            } else {
+                                yield* Effect.fail(
+                                    new TxSubmissionError({
+                                        cause:
+                                            `Unexpected server message: ${msg._tag}`,
+                                    }),
+                                );
+                            }
+                        }).pipe(Effect.forever);
                     },
                 ),
                 done: Effect.fn("TxSubmissionClient.done")(
