@@ -1,9 +1,9 @@
 export * from "./Client";
 export {
-  LocalStateQueryMessage,
-  LocalStateQueryMessageBytes,
-  LocalStateQueryMessageFromCbor,
-  LocalStateQueryMessageType,
-  LocalStateQueryMessageTypeSchema,
-  type LocalStateQueryMessageT,
+    LocalStateQueryMessage,
+    LocalStateQueryMessageBytes,
+    LocalStateQueryMessageFromCbor,
+    type LocalStateQueryMessageT,
+    LocalStateQueryMessageType,
+    LocalStateQueryMessageTypeSchema,
 } from "./Schemas";

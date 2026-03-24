@@ -41,7 +41,7 @@
         treefmt = {
           projectRootFile = "flake.nix";
           programs = {
-            deno.enable = true;
+            oxfmt.enable = true;
             nixpkgs-fmt.enable = true;
             rustfmt.enable = true;
           };
@@ -52,6 +52,10 @@
             poppler-utils
             wasm-pack
           ];
+
+          files.".oxfmtrc.json".json = {
+            tabWidth = 4;
+          };
 
           languages = {
             rust = {

@@ -1,13 +1,13 @@
 export * from "./Client";
 export {
-  PeerSharingMessage,
-  PeerSharingMessageBytes,
-  PeerSharingMessageFromCbor,
-  PeerSharingMessageType,
-  PeerSharingMessageTypeSchema,
-  PeerAddressSchema,
-  PeerAddressFromCbor,
-  PeerAddressType,
-  type PeerSharingMessageT,
-  type PeerAddress,
+    type PeerAddress,
+    PeerAddressFromCbor,
+    PeerAddressSchema,
+    PeerAddressType,
+    PeerSharingMessage,
+    PeerSharingMessageBytes,
+    PeerSharingMessageFromCbor,
+    type PeerSharingMessageT,
+    PeerSharingMessageType,
+    PeerSharingMessageTypeSchema,
 } from "./Schemas";

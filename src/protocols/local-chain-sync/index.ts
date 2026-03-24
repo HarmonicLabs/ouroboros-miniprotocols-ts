@@ -1,9 +1,9 @@
 export * from "./Client";
 export {
-  LocalChainSyncMessage,
-  LocalChainSyncMessageBytes,
-  LocalChainSyncMessageFromCbor,
-  LocalChainSyncMessageType,
-  LocalChainSyncMessageTypeSchema,
-  type LocalChainSyncMessageT,
+    LocalChainSyncMessage,
+    LocalChainSyncMessageBytes,
+    LocalChainSyncMessageFromCbor,
+    type LocalChainSyncMessageT,
+    LocalChainSyncMessageType,
+    LocalChainSyncMessageTypeSchema,
 } from "./Schemas";
