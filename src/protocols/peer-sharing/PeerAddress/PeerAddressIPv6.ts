@@ -8,8 +8,8 @@ type RawIPv6 = [ number, number, number, number ];
 export function isRawIPv6( stuff: any ): stuff is RawIPv6
 {
     if(
-        !Array.isArray( stuff ) &&
-        stuff.length >= 4
+        !Array.isArray( stuff ) ||
+        stuff.length < 4
     ) return false;
 
     return (
@@ -32,14 +32,12 @@ export function isIPeerAddressIPv6( peerAddress: any ): peerAddress is IPeerAddr
     return ( 
         isRawIPv6( peerAddress.address ) &&
         (
-            hasOwn( peerAddress, "flowInfo" ) ?
-            isWord32( peerAddress.flowInfo ) :
-            (peerAddress as any).flowInfo === undefined
+            (peerAddress as any).flowInfo === undefined ||
+            isWord32( peerAddress.flowInfo )
         ) &&
         (
-            hasOwn( peerAddress, "scopeId" ) ?
-            isWord32( peerAddress.scopeId ) :
-            (peerAddress as any).scopeId === undefined
+            (peerAddress as any).scopeId === undefined ||
+            isWord32( peerAddress.scopeId )
         ) &&
         isWord16( peerAddress.portNumber )
     );
@@ -96,7 +94,7 @@ export class PeerAddressIPv6
 
     toCborBytes(): Uint8Array
     {
-        return this.toCbor().toBuffer();
+        return this.toCbor();
     }
     toCbor(): CborString
     {
