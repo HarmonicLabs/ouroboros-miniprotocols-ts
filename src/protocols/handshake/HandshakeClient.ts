@@ -226,18 +226,29 @@ export class HandshakeClient
         const isN2N = self.mplexer.isN2N;
         const versionTable = normalizeProposeArg( arg, isN2N );
 
-        return new Promise( async (resolve) => {
+        return new Promise((resolve, reject) => {
             function handleAll( msg: HandshakeAcceptVersion | HandshakeRefuse | HandshakeQueryReply ): void
+            {
+                cleanup();
+                resolve( msg );
+            }
+            function handleMuxError( err: Error ): void
+            {
+                cleanup();
+                reject( err );
+            }
+            function cleanup(): void
             {
                 self.off("accept", handleAll );
                 self.off("refuse", handleAll );
                 self.off("queryReply", handleAll );
-                resolve( msg );
+                self.mplexer.off("error", handleMuxError );
             }
 
             self.on("accept", handleAll );
             self.on("refuse", handleAll );
             self.on("queryReply", handleAll );
+            self.mplexer.on("error", handleMuxError );
 
             this.mplexer.send(
                 new HandshakeProposeVersion(
