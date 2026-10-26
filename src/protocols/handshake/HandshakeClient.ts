@@ -243,7 +243,7 @@ export class HandshakeClient
                 new HandshakeProposeVersion(
                     { versionTable },
                     this.mplexer.isN2N
-                ).toCbor().toBuffer(),
+                ).toCbor(),
                 mplexerHeader
             );
         });

@@ -46,11 +46,11 @@ export class ChainSyncRollForward
     toCborBytes(): Uint8Array
     {
         if( this.cborRef instanceof SubCborRef ) return this.cborRef.toBuffer();
-        return this.toCbor().toBuffer();
+        return this.toCbor();
     }
     toCbor(): CborString
     {
-        if( this.cborRef instanceof SubCborRef ) return new CborString( this.cborRef.toBuffer() );
+        if( this.cborRef instanceof SubCborRef ) return this.cborRef.toBuffer();
         return Cbor.encode( this.toCborObj() );
     }
     toCborObj(): CborArray
@@ -79,7 +79,7 @@ export class ChainSyncRollForward
     {
         const buff = cbor instanceof Uint8Array ?
             cbor: 
-            forceCborString( cbor ).toBuffer();
+            forceCborString( cbor );
 
         return ChainSyncRollForward.fromCborObj( Cbor.parse( buff ), buff );
     }

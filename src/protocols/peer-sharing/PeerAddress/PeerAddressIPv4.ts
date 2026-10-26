@@ -31,7 +31,7 @@ export class PeerAddressIPv4 implements IPeerAddressIPv4, ToCborString, ToCborOb
 
     toCborBytes(): Uint8Array
     {
-        return this.toCbor().toBuffer();
+        return this.toCbor();
     }
     toCbor(): CborString
     {

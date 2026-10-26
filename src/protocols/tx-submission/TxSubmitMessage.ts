@@ -37,7 +37,7 @@ export function isTxSubmitMessage( stuff: any ): stuff is TxSubmitMessage {
 export function txSubmitSubmitMessageFromCbor( cbor: CanBeCborString ): TxSubmitMessage {
     const buff = cbor instanceof Uint8Array ? 
         cbor : 
-        forceCborString( cbor ).toBuffer();
+        forceCborString( cbor );
     
     const msg = txSubmitMessageFromCborObj( Cbor.parse( buff ) );
 

@@ -20,7 +20,7 @@ export class PeerSharingResponse implements ToCborString, ToCborObj, IPeerSharin
 
     toCborBytes(): Uint8Array
     {
-        return this.toCbor().toBuffer();
+        return this.toCbor();
     }
     toCbor(): CborString {
         return Cbor.encode( this.toCborObj() );
@@ -33,7 +33,7 @@ export class PeerSharingResponse implements ToCborString, ToCborObj, IPeerSharin
     }
 
     static fromCbor( cbor: CanBeCborString ): PeerSharingResponse {
-        const buff = cbor instanceof Uint8Array ? cbor: forceCborString( cbor ).toBuffer();
+        const buff = cbor instanceof Uint8Array ? cbor: forceCborString( cbor );
         return PeerSharingResponse.fromCborObj( Cbor.parse( buff ) );
     }
     static fromCborObj( cbor: CborObj ): PeerSharingResponse {

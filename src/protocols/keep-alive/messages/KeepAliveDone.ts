@@ -18,7 +18,7 @@ export class KeepAliveDone
 
     toCborBytes(): Uint8Array
     {
-        return this.toCbor().toBuffer();
+        return this.toCbor();
     }
     toCbor(): CborString
     {
@@ -33,7 +33,7 @@ export class KeepAliveDone
     {
         const buff = cbor instanceof Uint8Array ?
             cbor: 
-            forceCborString( cbor ).toBuffer();
+            forceCborString( cbor );
             
         return KeepAliveDone.fromCborObj( Cbor.parse( buff, { keepRef: false } ) );
     }

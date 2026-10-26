@@ -366,7 +366,7 @@ export class LocalStateQueryClient
     sendAcquire( point?: IChainPoint ): void
     {
         this.mplexer.send(
-            new QryAcquire({ point }).toCbor().toBuffer(),
+            new QryAcquire({ point }).toCbor(),
             lsqClientHeader
         );
     }
@@ -398,7 +398,7 @@ export class LocalStateQueryClient
     sendQuery( query: CborObj ): void
     {
         this.mplexer.send(
-            new QryQuery({ query }).toCbor().toBuffer(),
+            new QryQuery({ query }).toCbor(),
             lsqClientHeader
         );
     }
@@ -441,7 +441,7 @@ export class LocalStateQueryClient
     sendRelease(): void
     {
         this.mplexer.send(
-            new QryRelease().toCbor().toBuffer(),
+            new QryRelease().toCbor(),
             lsqClientHeader
         );
     }
@@ -453,7 +453,7 @@ export class LocalStateQueryClient
     done(): void
     {
         this.mplexer.send(
-            new QryDone().toCbor().toBuffer(),
+            new QryDone().toCbor(),
             lsqClientHeader
         );
         this.clearListeners();

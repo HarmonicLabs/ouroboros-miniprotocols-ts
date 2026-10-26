@@ -175,7 +175,7 @@ export class TxSubmitServer
                     blocking,
                     knownTxCount: acknowleged,
                     requestedTxCount: requesting
-                }).toCbor().toBuffer(),
+                }).toCbor(),
                 {
                     hasAgency: true,
                     protocol: MiniProtocol.TxSubmission
@@ -197,7 +197,7 @@ export class TxSubmitServer
             self.on("replyTxs", handleReply );
 
             self.mplexer.send(
-                new TxSubmitReplyTxs({ txs: txHashes }).toCbor().toBuffer(),
+                new TxSubmitReplyTxs({ txs: txHashes }).toCbor(),
                 {
                     hasAgency: true,
                     protocol: MiniProtocol.TxSubmission

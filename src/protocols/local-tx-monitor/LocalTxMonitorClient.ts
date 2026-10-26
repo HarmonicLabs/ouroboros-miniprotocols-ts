@@ -305,7 +305,7 @@ export class TxMonitorClient
             self.addEventListener("acquired", handleAcquired)
             
             self.mplexer.send(
-                new TxMonitorAcquire().toCbor().toBuffer(),
+                new TxMonitorAcquire().toCbor(),
                 agencyHeader
             );
         });
@@ -314,7 +314,7 @@ export class TxMonitorClient
     done(): void
     {
         this.mplexer.send(
-            new TxMonitorDone().toCbor().toBuffer(),
+            new TxMonitorDone().toCbor(),
             agencyHeader
         );
     }
@@ -322,7 +322,7 @@ export class TxMonitorClient
     release(): void
     {
         this.mplexer.send(
-            new TxMonitorRelease().toCbor().toBuffer(),
+            new TxMonitorRelease().toCbor(),
             agencyHeader
         );
     }
@@ -338,7 +338,7 @@ export class TxMonitorClient
             }
             self.addEventListener("replyNextTx", handleReply);
             this.mplexer.send(
-                new TxMonitorNextTx().toCbor().toBuffer(),
+                new TxMonitorNextTx().toCbor(),
                 agencyHeader
             );
         });
@@ -361,7 +361,7 @@ export class TxMonitorClient
             this.mplexer.send(
                 new TxMonitorHasTx({
                     txId: hash as Uint8Array
-                }).toCbor().toBuffer(),
+                }).toCbor(),
                 agencyHeader
             );
         });
@@ -378,7 +378,7 @@ export class TxMonitorClient
             }
             self.addEventListener("replyGetSizes", handleReply);
             this.mplexer.send(
-                new TxMonitorGetSizes().toCbor().toBuffer(),
+                new TxMonitorGetSizes().toCbor(),
                 agencyHeader
             );
         })

@@ -42,11 +42,11 @@ export class ChainSyncRollBackwards
     toCborBytes(): Uint8Array
     {
         if( this.cborRef instanceof SubCborRef ) return this.cborRef.toBuffer();
-        return this.toCbor().toBuffer();
+        return this.toCbor();
     }
     toCbor(): CborString
     {
-        if( this.cborRef instanceof SubCborRef ) return new CborString( this.cborRef.toBuffer() );
+        if( this.cborRef instanceof SubCborRef ) return this.cborRef.toBuffer();
         return Cbor.encode( this.toCborObj() );
     }
     toCborObj(): CborArray
@@ -63,7 +63,7 @@ export class ChainSyncRollBackwards
     {
         const buff = cbor instanceof Uint8Array ?
             cbor: 
-            forceCborString( cbor ).toBuffer();
+            forceCborString( cbor );
             
         return ChainSyncRollBackwards.fromCborObj( Cbor.parse( buff ), buff );
     }

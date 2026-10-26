@@ -250,7 +250,7 @@ export class LocalTxSubmitClient
         });
     }
 
-    submit( txData: Uint8Array ): Promise<LocalTxSubmitResult>
+    submit( txData: Uint8Array, era?: number | bigint ): Promise<LocalTxSubmitResult>
     {
         const self = this;
         return new Promise( resolve => {
@@ -276,7 +276,7 @@ export class LocalTxSubmitClient
             self.on("accept", handleAccept);
             self.on("reject", handleReject)
             self.mplexer.send(
-                new LocalTxSubmitSubmit({ tx: txData }).toCbor().toBuffer(),
+                new LocalTxSubmitSubmit({ tx: txData, era }).toCbor(),
                 {
                     hasAgency: true,
                     protocol: MiniProtocol.LocalTxSubmission
@@ -288,7 +288,7 @@ export class LocalTxSubmitClient
     done(): void
     {
         this.mplexer.send(
-            new LocalTxSubmitDone().toCbor().toBuffer(),
+            new LocalTxSubmitDone().toCbor(),
             {
                 hasAgency: true,
                 protocol: MiniProtocol.LocalTxSubmission

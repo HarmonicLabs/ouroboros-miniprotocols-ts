@@ -217,7 +217,7 @@ export class ChainSyncServer
     sendIntersectFound( point: IChainPoint, tip: IChainTip ): void
     {
         this.multiplexer.send(
-            new ChainSyncIntersectFound({ point, tip }).toCbor().toBuffer(),
+            new ChainSyncIntersectFound({ point, tip }).toCbor(),
             { 
                 hasAgency: true, 
                 protocol: MiniProtocol.ChainSync 
@@ -230,7 +230,7 @@ export class ChainSyncServer
     sendIntersectNotFound( tip: IChainTip ): void
     {
         this.multiplexer.send(
-            new ChainSyncIntersectNotFound({ tip }).toCbor().toBuffer(),
+            new ChainSyncIntersectNotFound({ tip }).toCbor(),
             { 
                 hasAgency: true, 
                 protocol: MiniProtocol.ChainSync 
@@ -317,7 +317,7 @@ export class ChainSyncServer
     sendAwaitReply(): void
     {
         this.multiplexer.send(
-            new ChainSyncAwaitReply().toCbor().toBuffer(),
+            new ChainSyncAwaitReply().toCbor(),
             { 
                 hasAgency: true, 
                 protocol: MiniProtocol.ChainSync 
@@ -332,7 +332,7 @@ export class ChainSyncServer
             new ChainSyncRollBackwards({ 
                 point: rollbackPoint, 
                 tip: tip ?? await this.chainDb.getTip()
-            }).toCbor().toBuffer(),
+            }).toCbor(),
             { 
                 hasAgency: true, 
                 protocol: MiniProtocol.ChainSync 
@@ -347,7 +347,7 @@ export class ChainSyncServer
             new ChainSyncRollForward({ 
                 data: new CborTag(24, new CborBytes( data )),
                 tip: tip ?? await this.chainDb.getTip()
-            }).toCbor().toBuffer(),
+            }).toCbor(),
             { 
                 hasAgency: true, 
                 protocol: MiniProtocol.ChainSync 

@@ -243,7 +243,7 @@ export class PeerSharingClient {
 
     done(): void {
         this.multiplexer.send(
-            new PeerSharingDone().toCbor().toBuffer(),
+            new PeerSharingDone().toCbor(),
             agencyHeader
         );
     }
@@ -260,7 +260,7 @@ export class PeerSharingClient {
             self.addEventListener("response", handleResponse)
             
             self.multiplexer.send(
-                new PeerSharingRequest({ amount }).toCbor().toBuffer(),
+                new PeerSharingRequest({ amount }).toCbor(),
                 agencyHeader
             );
         });

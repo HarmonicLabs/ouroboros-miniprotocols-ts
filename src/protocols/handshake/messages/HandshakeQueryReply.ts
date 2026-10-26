@@ -22,7 +22,7 @@ export class HandshakeQueryReply
 
     toCborBytes(): Uint8Array
     {
-        return this.toCbor().toBuffer();
+        return this.toCbor();
     }
     toCbor(): CborString
     {

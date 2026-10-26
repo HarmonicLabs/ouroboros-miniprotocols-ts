@@ -256,7 +256,7 @@ export class TxSubmitClient
         const response = mempoolTxs.map(({ bytes }) => bytes );
         
         this.mplexer.send(
-            new TxSubmitReplyTxs({ txs: response }).toCbor().toBuffer(),
+            new TxSubmitReplyTxs({ txs: response }).toCbor(),
             { 
                 hasAgency: true, 
                 protocol: MiniProtocol.TxSubmission 
@@ -287,7 +287,7 @@ export class TxSubmitClient
         }
 
         this.mplexer.send( 
-            new TxSubmitDone().toCbor().toBuffer(),
+            new TxSubmitDone().toCbor(),
             { 
                 hasAgency: true, 
                 protocol: MiniProtocol.TxSubmission 
@@ -309,7 +309,7 @@ export class TxSubmitClient
         const filteredResponse = response.slice( knownTxCount, knownTxCount + requestedTxCount );
 
         this.mplexer.send( 
-            new TxSubmitReplyIds({ response: filteredResponse }).toCbor().toBuffer(),
+            new TxSubmitReplyIds({ response: filteredResponse }).toCbor(),
             { 
                 hasAgency: true, 
                 protocol: MiniProtocol.TxSubmission 

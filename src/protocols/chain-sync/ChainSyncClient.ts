@@ -455,7 +455,7 @@ export class ChainSyncClient
             this.once("rollForward", resolveForward );
             this.once("rollBackwards", resolveBackwards );
             this.mplexer.send(
-                new ChainSyncRequestNext().toCbor().toBuffer(),
+                new ChainSyncRequestNext().toCbor(),
                 {
                     hasAgency: true,
                     protocol: this.mplexer.isN2N ? 
@@ -485,7 +485,7 @@ export class ChainSyncClient
             this.once("intersectFound", resolveFound );
             this.once("intersectNotFound", resolveNotFound );
             this.mplexer.send(
-                new ChainSyncFindIntersect({ points }).toCbor().toBuffer(),
+                new ChainSyncFindIntersect({ points }).toCbor(),
                 {
                     hasAgency: true,
                     protocol: this.mplexer.isN2N ? 
@@ -499,7 +499,7 @@ export class ChainSyncClient
     done(): void
     {
         this.mplexer.send(
-            new ChainSyncMessageDone().toCbor().toBuffer(),
+            new ChainSyncMessageDone().toCbor(),
             {
                 hasAgency: true,
                 protocol: this.mplexer.isN2N ? 

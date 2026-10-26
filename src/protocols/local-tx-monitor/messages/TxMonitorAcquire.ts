@@ -21,7 +21,7 @@ export class TxMonitorAcquire
 
     toCborBytes(): Uint8Array
     {
-        return this.toCbor().toBuffer();
+        return this.toCbor();
     }
     toCbor(): CborString
     {
@@ -29,7 +29,7 @@ export class TxMonitorAcquire
     }
     toCborObj(): CborArray
     {
-        return new CborArray([ new CborUInt(3) ]);
+        return new CborArray([ new CborUInt(1) ]);
     }
 
     static fromCbor( cbor: CanBeCborString ): TxMonitorAcquire
@@ -41,7 +41,7 @@ export class TxMonitorAcquire
         if(!(
             cbor instanceof CborArray &&
             cbor.array[0] instanceof CborUInt &&
-            cbor.array[0].num === BigInt(3)
+            cbor.array[0].num === BigInt(1)
         )) throw new Error("invalid CBOR for 'TxMonitorAcquire");
 
         return new TxMonitorAcquire();

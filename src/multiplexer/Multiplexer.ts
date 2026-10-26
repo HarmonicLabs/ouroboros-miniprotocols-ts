@@ -160,7 +160,12 @@ export class Multiplexer
         function handleSocketError( thing: Error | Event ): void
         {
             _wasClosed = true;
-            const err = new Error("socket error");
+            const message = thing instanceof Error ?
+                "socket error: " + thing.message :
+                "socket error";
+            const err = new Error( message );
+            // `cause` (standard, ES2022) and `data` (legacy) both point to the original error
+            (err as any).cause = thing;
             (err as any).data = thing;
             dispatchEvent("error", err);
             return;

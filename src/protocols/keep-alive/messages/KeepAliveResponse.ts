@@ -31,7 +31,7 @@ export class KeepAliveResponse
 
     toCborBytes(): Uint8Array
     {
-        return this.toCbor().toBuffer();
+        return this.toCbor();
     }
     toCbor(): CborString
     {
@@ -49,7 +49,7 @@ export class KeepAliveResponse
     {
         const buff = cbor instanceof Uint8Array ?
             cbor: 
-            forceCborString( cbor ).toBuffer();
+            forceCborString( cbor );
             
         return KeepAliveResponse.fromCborObj( Cbor.parse( buff ) );
     }

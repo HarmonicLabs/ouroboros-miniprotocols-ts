@@ -30,7 +30,7 @@ export class QryAcquire
 
     toCborBytes(): Uint8Array
     {
-        return this.toCbor().toBuffer();
+        return this.toCbor();
     }
     toCbor(): CborString
     {
@@ -48,7 +48,7 @@ export class QryAcquire
 
     static fromCbor( cbor: CanBeCborString ): QryAcquire
     {
-        const bytes = cbor instanceof Uint8Array ? cbor : forceCborString( cbor ).toBuffer();
+        const bytes = cbor instanceof Uint8Array ? cbor : forceCborString( cbor );
         return QryAcquire.fromCborObj(
             Cbor.parse( bytes, { keepRef: false } )
         );

@@ -32,11 +32,11 @@ export class QryResult
     toCborBytes(): Uint8Array
     {
         if( this.cborRef instanceof SubCborRef ) return this.cborRef.toBuffer();
-        return this.toCbor().toBuffer();
+        return this.toCbor();
     }
     toCbor(): CborString
     {
-        if( this.cborRef instanceof SubCborRef ) return new CborString( this.cborRef.toBuffer() );
+        if( this.cborRef instanceof SubCborRef ) return this.cborRef.toBuffer();
         return Cbor.encode( this.toCborObj() );
     }
     toCborObj(): CborArray
@@ -50,7 +50,7 @@ export class QryResult
 
     static fromCbor( cbor: CanBeCborString ): QryResult
     {
-        const bytes = cbor instanceof Uint8Array ? cbor : forceCborString( cbor ).toBuffer();
+        const bytes = cbor instanceof Uint8Array ? cbor : forceCborString( cbor );
         return QryResult.fromCborObj( Cbor.parse( bytes, { keepRef: true } ), bytes );
     }
     static fromCborObj(

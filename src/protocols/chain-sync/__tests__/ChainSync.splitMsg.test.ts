@@ -57,7 +57,7 @@ test.skip("ChainSync", async () => {
                         }
                     }
                 ]
-            }).toCbor().toBuffer(),
+            }).toCbor(),
             {
                 hasAgency: true,
                 protocol: MiniProtocol.Handshake

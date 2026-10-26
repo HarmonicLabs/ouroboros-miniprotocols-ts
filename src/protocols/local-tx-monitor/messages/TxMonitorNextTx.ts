@@ -19,7 +19,7 @@ export class TxMonitorNextTx
 
     toCborBytes(): Uint8Array
     {
-        return this.toCbor().toBuffer();
+        return this.toCbor();
     }
     toCbor(): CborString
     {
@@ -32,7 +32,7 @@ export class TxMonitorNextTx
 
     static fromCbor( cbor: CanBeCborString ): TxMonitorNextTx
     {
-        const bytes = cbor instanceof Uint8Array ? cbor : forceCborString( cbor ).toBuffer();
+        const bytes = cbor instanceof Uint8Array ? cbor : forceCborString( cbor );
         return TxMonitorNextTx.fromCborObj( Cbor.parse( bytes, { keepRef: true } ), bytes );
     }
     static fromCborObj(

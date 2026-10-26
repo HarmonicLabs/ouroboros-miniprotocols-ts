@@ -12,7 +12,7 @@ export class PeerSharingDone implements ToCborString, ToCborObj, IPeerSharingDon
 
     toCborBytes(): Uint8Array
     {
-        return this.toCbor().toBuffer();
+        return this.toCbor();
     }
     toCbor(): CborString {
         return Cbor.encode( this.toCborObj() );
@@ -23,7 +23,7 @@ export class PeerSharingDone implements ToCborString, ToCborObj, IPeerSharingDon
 
     static fromCbor( cbor: CanBeCborString ): PeerSharingDone
     {
-        const buff = cbor instanceof Uint8Array ? cbor: forceCborString( cbor ).toBuffer();
+        const buff = cbor instanceof Uint8Array ? cbor: forceCborString( cbor );
         return PeerSharingDone.fromCborObj( Cbor.parse( buff ) );
     }
 

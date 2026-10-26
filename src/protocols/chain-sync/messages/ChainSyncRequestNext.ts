@@ -22,11 +22,11 @@ export class ChainSyncRequestNext
     toCborBytes(): Uint8Array
     {
         if( this.cborRef instanceof SubCborRef ) return this.cborRef.toBuffer();
-        return this.toCbor().toBuffer();
+        return this.toCbor();
     }
     toCbor(): CborString
     {
-        if( this.cborRef instanceof SubCborRef ) return new CborString( this.cborRef.toBuffer() );
+        if( this.cborRef instanceof SubCborRef ) return this.cborRef.toBuffer();
         return Cbor.encode( this.toCborObj() );
     }
     toCborObj(): CborArray
@@ -40,7 +40,7 @@ export class ChainSyncRequestNext
     {
         const buff = cbor instanceof Uint8Array ?
             cbor: 
-            forceCborString( cbor ).toBuffer();
+            forceCborString( cbor );
 
         return ChainSyncRequestNext.fromCborObj( Cbor.parse( buff ), buff );
     }

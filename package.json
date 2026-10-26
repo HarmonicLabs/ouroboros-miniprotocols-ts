@@ -1,6 +1,6 @@
 {
   "name": "@harmoniclabs/ouroboros-miniprotocols-ts",
-  "version": "0.0.5-dev7",
+  "version": "0.0.5-dev11-gravity1",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
@@ -14,7 +14,7 @@
     "pub": "npm run ci && npm pub"
   },
   "dependencies": {
-    "@harmoniclabs/cbor": "^1.6.5",
+    "@harmoniclabs/cbor": "^2.0.2",
     "@harmoniclabs/obj-utils": "^1.0.0",
     "@harmoniclabs/uint8array-utils": "^1.0.3",
     "@types/node": "^20.1.7"

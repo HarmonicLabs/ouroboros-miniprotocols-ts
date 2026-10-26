@@ -430,7 +430,7 @@ export class BlockFetchClient
             self.on("block", handleBlock);
 
             self.mplexer.send(
-                new BlockFetchRequestRange({ from, to }).toCbor().toBuffer(),
+                new BlockFetchRequestRange({ from, to }).toCbor(),
                 {
                     hasAgency: true,
                     protocol: MiniProtocol.BlockFetch
@@ -442,7 +442,7 @@ export class BlockFetchClient
     done(): void
     {
         this.mplexer.send(
-            new BlockFetchClientDone().toCbor().toBuffer(),
+            new BlockFetchClientDone().toCbor(),
             {
                 hasAgency: true,
                 protocol: MiniProtocol.BlockFetch

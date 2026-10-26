@@ -174,7 +174,7 @@ export class BlockFetchServer
     sendNoBlocks()
     {
         this.multiplexer.send(
-            new BlockFetchNoBlocks().toCbor().toBuffer(),
+            new BlockFetchNoBlocks().toCbor(),
             { 
                 hasAgency: true, 
                 protocol: MiniProtocol.BlockFetch 
@@ -184,7 +184,7 @@ export class BlockFetchServer
     sendStartBatch()
     {
         this.multiplexer.send(
-            new BlockFetchStartBatch().toCbor().toBuffer(),
+            new BlockFetchStartBatch().toCbor(),
             { 
                 hasAgency: true, 
                 protocol: MiniProtocol.BlockFetch 
@@ -194,7 +194,7 @@ export class BlockFetchServer
     sendBatchDone()
     {
         this.multiplexer.send(
-            new BlockFetchBatchDone().toCbor().toBuffer(),
+            new BlockFetchBatchDone().toCbor(),
             { 
                 hasAgency: true, 
                 protocol: MiniProtocol.BlockFetch 
@@ -218,7 +218,7 @@ export class BlockFetchServer
             this.multiplexer.send(
                 new BlockFetchBlock({ 
                     blockData: block.toCborBytes() 
-                }).toCbor().toBuffer(),
+                }).toCbor(),
                 { 
                     hasAgency: true, 
                     protocol: MiniProtocol.BlockFetch 

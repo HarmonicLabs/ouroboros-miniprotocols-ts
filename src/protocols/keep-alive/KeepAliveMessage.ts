@@ -32,7 +32,7 @@ export function keepAliveMessageFromCbor( cbor: CanBeCborString ): KeepAliveMess
 {
     const buff = cbor instanceof Uint8Array ? 
         cbor : 
-        forceCborString( cbor ).toBuffer();
+        forceCborString( cbor );
     
     const msg = keepAliveMessageFromCborObj( Cbor.parse( buff ) );
 

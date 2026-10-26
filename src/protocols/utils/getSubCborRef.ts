@@ -18,7 +18,7 @@ export function getSubCborRef(
         return cObj.subCborRef.clone(); // does not clone bytes, only the object
     }
 
-    const bytes = originalBytes instanceof Uint8Array ? originalBytes : Cbor.encode( cObj ).toBuffer();
+    const bytes = originalBytes instanceof Uint8Array ? originalBytes : Cbor.encode( cObj );
 
     // encoding might have created a new SubCborRef
     if( (cObj as CborObj).subCborRef instanceof SubCborRef )

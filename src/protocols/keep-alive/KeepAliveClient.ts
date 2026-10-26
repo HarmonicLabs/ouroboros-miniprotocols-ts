@@ -252,7 +252,7 @@ export class KeepAliveClient
     done(): void
     {
         this.mplexer.send(
-            new KeepAliveDone().toCbor().toBuffer(),
+            new KeepAliveDone().toCbor(),
             agencyHeader
         );
     }
@@ -269,7 +269,7 @@ export class KeepAliveClient
             self.addEventListener("response", handleResponse)
             
             self.mplexer.send(
-                new KeepAliveRequest({ cookie }).toCbor().toBuffer(),
+                new KeepAliveRequest({ cookie }).toCbor(),
                 agencyHeader
             );
         });

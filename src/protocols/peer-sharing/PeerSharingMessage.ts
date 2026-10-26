@@ -29,7 +29,7 @@ export function isIPeerSharingMessage( stuff: any ): stuff is IPeerSharingMessag
 export function peerSharingMessageFromCbor( cbor: CanBeCborString ): PeerSharingMessage {
     const buff = cbor instanceof Uint8Array ? 
         cbor : 
-        forceCborString( cbor ).toBuffer();
+        forceCborString( cbor );
     
     const msg = peerSharingMessageFromCborObj( Cbor.parse( buff ) );
 

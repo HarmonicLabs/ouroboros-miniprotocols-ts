@@ -1,7 +1,10 @@
-import { CanBeCborString, Cbor, CborArray, CborBytes, CborObj, CborString, CborTag, CborUInt, LazyCborArray, SubCborRef, ToCbor, ToCborObj, forceCborString } from "@harmoniclabs/cbor";
+import { CanBeCborString, Cbor, CborArray, CborBytes, CborObj, CborString, CborTag, CborUInt, LazyCborArray, SubCborRef, ToCbor, ToCborObj, canBeCborString, forceCborString } from "@harmoniclabs/cbor";
 import { LazyCborTag } from "@harmoniclabs/cbor/dist/LazyCborObj/LazyCborTag";
 import { hasOwn, isObject } from "@harmoniclabs/obj-utils";
 import { getSubCborRef, subCborRefOrUndef } from "../../utils/getSubCborRef";
+
+const isHexString = ( str: string ): boolean =>
+    str.length % 2 === 0 && /^[0-9a-fA-F]*$/.test( str );
 
 export interface IBlockFetchBlock {
     blockData: CanBeCborString
@@ -11,11 +14,12 @@ export function isIBlockFetchBlock( stuff: any ): stuff is IBlockFetchBlock
 {
     return isObject( stuff ) && (
         hasOwn( stuff, "blockData" ) &&
-        (
-            CborString.isValidHexValue( stuff.blockData ) ||
-            stuff.blockData instanceof Uint8Array ||
-            stuff.blockData instanceof CborString
-        )
+        // cbor 2.x: `CborString` is a type alias for `Uint8Array` — there is no runtime
+        // class and no `isValidHexValue`. `CanBeCborString` is `string | Uint8Array`, and a
+        // string only works because `forceCborString` hex-decodes it, so keep rejecting
+        // non-hex strings here rather than letting `fromHex` produce garbage.
+        canBeCborString( stuff.blockData ) &&
+        ( stuff.blockData instanceof Uint8Array || isHexString( stuff.blockData ) )
     );
 }
 
@@ -33,18 +37,18 @@ export class BlockFetchBlock
             isIBlockFetchBlock( blk )
         )) throw new Error("invalid interface for 'BlockFetchBlock'");
 
-        this.blockData = blk.blockData instanceof Uint8Array ? blk.blockData : forceCborString( blk.blockData ).toBuffer();
+        this.blockData = blk.blockData instanceof Uint8Array ? blk.blockData : forceCborString( blk.blockData );
         this.cborRef = cborRef ?? subCborRefOrUndef( blk );
     };
 
     toCborBytes(): Uint8Array
     {
         if( this.cborRef instanceof SubCborRef ) return this.cborRef.toBuffer();
-        return this.toCbor().toBuffer();
+        return this.toCbor();
     }
     toCbor(): CborString
     {
-        if( this.cborRef instanceof SubCborRef ) return new CborString( this.cborRef.toBuffer() );
+        if( this.cborRef instanceof SubCborRef ) return this.cborRef.toBuffer();
         return Cbor.encode( this.toCborObj() );
     }
     toCborObj(): CborArray
@@ -84,7 +88,7 @@ export class BlockFetchBlock
     {
         const buff = cbor instanceof Uint8Array ?
             cbor: 
-            forceCborString( cbor ).toBuffer();
+            forceCborString( cbor );
 
         return BlockFetchBlock.fromCborObj(
             Cbor.parse( buff, { keepRef: true } ),

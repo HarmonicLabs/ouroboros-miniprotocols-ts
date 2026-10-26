@@ -46,7 +46,7 @@ export function chainSyncMessageFromCbor( cbor: CanBeCborString ): ChainSyncMess
 {
     const buff = cbor instanceof Uint8Array ? 
         cbor : 
-        forceCborString( cbor ).toBuffer();
+        forceCborString( cbor );
     
     const msg = chainSyncMessageFromCborObj( Cbor.parse( buff ) );
 
